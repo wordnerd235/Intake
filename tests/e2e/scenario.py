@@ -582,39 +582,48 @@ class Scenario:
     def online_search_and_barcode(self):
         p = self.page
         OFF = "search.openfoodfacts.org/search"
+        FDC = "nal.usda.gov/fdc/v1/foods/search"
         self.open_add()
-        # R-05: nothing goes out while typing; the online source is asked on Enter or when the row is tapped
-        before = self.net.count(OFF)
+        # R-05: nothing goes out while typing; USDA branded search runs on Enter or when the row is tapped
+        before, off_before = self.net.count(FDC), self.net.count(OFF)
         p.fill("#af-q", "")
         p.type("#af-q", "hazelnut spread", delay=40)
         p.wait_for_timeout(1500)
-        assert self.net.count(OFF) == before, "typing must not call the online source"
+        assert self.net.count(FDC) == before, "typing must not call the online source"
         row = p.locator(".sheet .online-row", has_text="Search branded foods online")
         expect(row).to_be_visible()
         p.press("#af-q", "Enter")
-        expect(p.locator(".sheet .res-name", has_text="Hazelnut Spread Test")).to_be_visible(timeout=8000)
-        expect(p.locator(".credit", has_text="Open Food Facts")).to_be_visible()
-        assert self.net.count(OFF) == before + 1
+        expect(p.locator(".sheet .online .res-name", has_text="Mock Crunchy Cereal Bar")).to_be_visible(timeout=8000)
+        expect(p.locator(".credit", has_text="USDA FoodData Central")).to_be_visible()
+        assert self.net.count(FDC) == before + 1
+        assert self.net.count(OFF) == off_before, "Open Food Facts runs only when asked"
         clean_text(p, "online results")
         self.shot("add-food-online", full=False)
+        # Open Food Facts on request; a busy first answer gets one automatic retry
+        self.net.fail_off_times = 1
+        p.get_by_role("button", name="Search Open Food Facts too").click()
+        expect(p.locator(".sheet .res-name", has_text="Hazelnut Spread Test")).to_be_visible(timeout=10000)
+        expect(p.locator(".credit", has_text="Open Food Facts")).to_be_visible()
+        assert self.net.count(OFF) == off_before + 2, "one failed request, then one retry"
+        assert self.net.fail_off_times == 0
         # the same query again is served from the session cache
         self.search("hazelnut spreads")
         self.search("hazelnut spread")
         p.press("#af-q", "Enter")
-        expect(p.locator(".sheet .res-name", has_text="Hazelnut Spread Test")).to_be_visible(timeout=8000)
-        assert self.net.count(OFF) == before + 1, "a repeated query must come from the cache"
+        expect(p.locator(".sheet .online .res-name", has_text="Mock Crunchy Cereal Bar")).to_be_visible(timeout=8000)
+        assert self.net.count(FDC) == before + 1, "a repeated query must come from the cache"
         # tapping the row works as well as Enter
         self.search("")
         p.type("#af-q", "granola crunch", delay=20)
         p.locator(".sheet .online-row .res-main").click()
-        expect(p.locator(".sheet .res-name", has_text="Hazelnut Spread Test")).to_be_visible(timeout=8000)
-        assert self.net.count(OFF) == before + 2
+        expect(p.locator(".sheet .online .res-name", has_text="Mock Crunchy Cereal Bar")).to_be_visible(timeout=8000)
+        assert self.net.count(FDC) == before + 2
         # no local match: one automatic search after a pause, never a second
         self.search("")
         p.fill("#af-q", "zzqxv blorp")
         p.wait_for_timeout(2200)
-        expect(p.locator(".sheet .res-name", has_text="Hazelnut Spread Test")).to_be_visible(timeout=8000)
-        assert self.net.count(OFF) == before + 3, "no-match query should search online exactly once"
+        expect(p.locator(".sheet .online .res-name", has_text="Mock Crunchy Cereal Bar")).to_be_visible(timeout=8000)
+        assert self.net.count(FDC) == before + 3, "no-match query should search online exactly once"
         # a busy server (429) gets a plain message
         self.net.rate_limit = True
         p.fill("#af-q", "kiwi smoothie bowl")

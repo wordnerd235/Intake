@@ -86,6 +86,29 @@ export async function searchOFF(q, o = {}) {
   return answered && !lastErr ? remember(key, []) : [];
 }
 
+/** Failures worth one more try: the service was slow, unreachable, busy or briefly broken. */
+const RETRYABLE = new Set(['timeout', 'network', 'rate', 'http']);
+
+/**
+ * Open Food Facts text search that tries once more after a pause when the first attempt fails.
+ * OFF is often slow or briefly busy; one retry clears most of those without hammering its rate limit.
+ * @param {string} q
+ * @param {{signal?:AbortSignal, fetchFn?:typeof fetch, retryDelayMs?:number}} [o]
+ * @returns {Promise<Object[]>} Foods
+ */
+export async function searchOFFWithRetry(q, { retryDelayMs = 2500, ...o } = {}) {
+  try {
+    return await searchOFF(q, o);
+  } catch (e) {
+    if (!RETRYABLE.has(e.kind)) throw e;
+    await new Promise((resolve, reject) => {
+      const t = setTimeout(resolve, retryDelayMs);
+      if (o.signal) o.signal.addEventListener('abort', () => { clearTimeout(t); reject(new OnlineError('aborted', 'Cancelled')); }, { once: true });
+    });
+    return searchOFF(q, o);
+  }
+}
+
 /**
  * Open Food Facts product by barcode.
  * @param {string} code

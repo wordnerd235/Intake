@@ -1,7 +1,7 @@
 // Online lookups: failure mapping and the two-host Open Food Facts search, with a fake fetch (no network).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getJson, searchOFF, describeError, OnlineError } from '../../js/online-foods.js';
+import { getJson, searchOFF, searchOFFWithRetry, describeError, OnlineError } from '../../js/online-foods.js';
 
 const reply = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 const hit = (code, name) => ({ code, product_name: name, nutriments: { 'energy-kcal_100g': 120 } });
@@ -49,4 +49,26 @@ test('searchOFF: every host failing is an error; a rate limit stops after one re
   const busy = script(reply(503, {}), reply(200, { products: [hit('2', 'Never reached')] }));
   await assert.rejects(searchOFF('busy query here', { fetchFn: busy }), (e) => e.kind === 'rate');
   assert.equal(busy.calls.length, 1, 'both hosts share one limit, so the second is not tried');
+});
+
+test('searchOFFWithRetry: a busy first answer is retried once after the pause', async () => {
+  const fetchFn = script(reply(503, {}), reply(200, { hits: [hit('7', 'Retry bar')] }));
+  const foods = await searchOFFWithRetry('retry bar once', { fetchFn, retryDelayMs: 1 });
+  assert.equal(foods.length, 1);
+  assert.equal(fetchFn.calls.length, 2);
+});
+
+test('searchOFFWithRetry: gives up after the one retry and reports the error', async () => {
+  const fetchFn = script(reply(503, {}));
+  await assert.rejects(searchOFFWithRetry('retry bar never', { fetchFn, retryDelayMs: 1 }), (e) => e.kind === 'rate');
+  assert.equal(fetchFn.calls.length, 2);
+});
+
+test('searchOFFWithRetry: cancelling during the pause stops without a second request', async () => {
+  const fetchFn = script(reply(503, {}));
+  const ctl = new AbortController();
+  const p = searchOFFWithRetry('retry bar cancel', { fetchFn, retryDelayMs: 5000, signal: ctl.signal });
+  setTimeout(() => ctl.abort(), 10);
+  await assert.rejects(p, (e) => e.kind === 'aborted');
+  assert.equal(fetchFn.calls.length, 1);
 });

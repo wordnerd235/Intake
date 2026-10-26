@@ -83,6 +83,7 @@ class Net:
         self.external = []
         self.fail_online = False  # when True the OFF/FDC mocks answer 503
         self.rate_limit = False  # when True the OFF/FDC mocks answer 429
+        self.fail_off_times = 0  # the next N Open Food Facts requests answer 503 (exercises the one automatic retry)
         self.offline = False  # mirrors context.set_offline(): mocked hosts must fail too
         self.fake_firebase = False  # serve in-page stand-ins for the Firebase SDK instead of the generic script stub
 
@@ -101,6 +102,9 @@ class Net:
             ok = lambda body: route.fulfill(status=200, content_type="application/json", headers={"access-control-allow-origin": "*"}, body=json.dumps(body))
             if self.rate_limit and ("openfoodfacts" in url or "nal.usda.gov" in url):
                 return route.fulfill(status=429, headers={"access-control-allow-origin": "*"}, body="slow down")
+            if self.fail_off_times and "openfoodfacts" in url:
+                self.fail_off_times -= 1
+                return route.fulfill(status=503, headers={"access-control-allow-origin": "*"}, body="unavailable")
             if self.fail_online and ("openfoodfacts" in url or "nal.usda.gov" in url):
                 return route.fulfill(status=503, headers={"access-control-allow-origin": "*"}, body="unavailable")
             if "search.openfoodfacts.org/search" in url:

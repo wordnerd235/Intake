@@ -3,7 +3,7 @@ import { h, sheet, select, field, numInput, button, icon, iconButton, toast, spi
 import { store } from '../store.js';
 import { loadFoods, searchLocal, resolveFood } from '../foods-db.js';
 import { buildIndex, searchIndex } from '../foods-search.js';
-import { searchOFF, searchFDC, barcodeOFF, barcodeFDC, describeError } from '../online-foods.js';
+import { searchOFFWithRetry, searchFDC, barcodeOFF, barcodeFDC, describeError } from '../online-foods.js';
 import { servingOptions, perForServing, customAsFood, recipeAsFood, mealTotals, emptyNutrients, servingText } from '../nutrition.js';
 import { mealLabel, notice } from '../components.js';
 import { starIcon } from '../facts.js';
@@ -207,54 +207,61 @@ export async function openAddFood(o = {}) {
     const head = h('h3', null, 'Online (branded)');
     const nq = normQ(q);
     if (q.length < 3) { host.replaceChildren(head); if (asked || noLocal) host.append(hint('Type at least 3 letters to search branded foods online.')); return; }
-    if (onlineCache.has(nq)) return renderOnline(my, q, host, onlineCache.get(nq), []);
-    const key = settings.fdcApiKey;
+    if (onlineCache.has(nq)) return renderOnline(my, q, host, onlineCache.get(nq), null);
     const go = () => searchOnline(my, q, host);
     host.replaceChildren(head, h('div', { class: 'res-row online-row' }, h('button', { type: 'button', class: 'res-main', onclick: go },
-      h('span', { class: 'res-text' }, h('span', { class: 'res-name' }, 'Search branded foods online'), h('span', { class: 'res-sub' }, `Open Food Facts${key ? ' and USDA' : ''} · or press Enter`)), icon('search', 18))));
+      h('span', { class: 'res-text' }, h('span', { class: 'res-name' }, 'Search branded foods online'), h('span', { class: 'res-sub' }, 'USDA branded foods · or press Enter')), icon('search', 18))));
     if (asked) go();
     else if (noLocal && !autoTried.has(nq)) {
       autoTimer = setTimeout(() => { if (my === seq) { autoTried.add(nq); go(); } }, 1000);
     }
   }
 
+  /** USDA branded search: the default online source (fast and reliable with the person's own key). */
   async function searchOnline(my, q, host) {
     clearTimeout(autoTimer);
     if (onlineCtl) onlineCtl.abort();
-    host.replaceChildren(h('h3', null, 'Online (branded)'), h('p', { class: 'muted res-hint load' }, spinner('Searching online'), ' Searching online…'));
+    host.replaceChildren(h('h3', null, 'Online (branded)'), h('p', { class: 'muted res-hint load' }, spinner('Searching online'), ' Searching USDA…'));
     onlineCtl = new AbortController();
-    const signal = onlineCtl.signal;
-    const key = settings.fdcApiKey;
-    const tasks = [searchOFF(q, { signal }).then((foods) => ({ name: 'Open Food Facts', foods, credit: 'Data: Open Food Facts (ODbL)' }))];
-    if (key) tasks.push(searchFDC(q, key, { signal }).then((foods) => ({ name: 'USDA FoodData Central', foods, credit: 'Data: USDA FoodData Central (public domain)' })));
-    const settled = await Promise.allSettled(tasks);
+    let foods = null;
+    let error = null;
+    try {
+      foods = await searchFDC(q, settings.fdcApiKey, { signal: onlineCtl.signal });
+    } catch (e) {
+      if (e.kind === 'aborted') return;
+      error = e;
+    }
     if (my !== seq) return;
-    const parts = settled.filter((r) => r.status === 'fulfilled').map((r) => r.value);
-    const errors = settled.filter((r) => r.status === 'rejected' && r.reason && r.reason.kind !== 'aborted').map((r) => r.reason);
-    if (!errors.length) {
-      onlineCache.set(normQ(q), parts);
+    if (!error) {
+      onlineCache.set(normQ(q), foods);
       if (onlineCache.size > 40) onlineCache.delete(onlineCache.keys().next().value);
     }
-    renderOnline(my, q, host, parts, errors);
+    renderOnline(my, q, host, foods, error);
   }
 
-  function renderOnline(my, q, host, parts, errors) {
-    const key = settings.fdcApiKey;
+  function renderOnline(my, q, host, foods, error) {
     host.replaceChildren(h('h3', null, 'Online (branded)'));
-    for (const e of errors) host.append(notice(describeError(e), 'warn', button('Retry', () => searchOnline(my, q, host), { variant: 'ghost' })));
-    for (const p of parts) host.append(...(p.foods.length ? p.foods.map((f) => foodRow(f, null)) : [hint(`No ${p.name} results for "${q}".`)]), h('p', { class: 'credit' }, p.credit));
-    if (!key) host.append(button('Also search USDA branded foods', async (e) => {
-      const b = e.currentTarget;
-      b.disabled = true;
-      try {
-        const foods = await searchFDC(q, '', {});
-        if (my !== seq) return;
-        b.replaceWith(...(foods.length ? foods.map((f) => foodRow(f, null)) : [hint('No USDA branded results.')]), h('p', { class: 'credit' }, 'Data: USDA FoodData Central (public domain)'));
-      } catch (er) {
-        b.disabled = false;
-        host.append(notice(`${describeError(er, 'USDA')} A free key from fdc.nal.usda.gov/api-key-signup removes the shared limit; add it in More.`, 'warn'));
-      }
-    }, { variant: 'secondary', cls: 'fdc-btn' }));
+    if (error) {
+      const tip = settings.fdcApiKey ? '' : ' A free key from fdc.nal.usda.gov/api-key-signup removes the shared limit; add it in More.';
+      host.append(notice(`${describeError(error, 'USDA')}${tip}`, 'warn', button('Retry', () => searchOnline(my, q, host), { variant: 'ghost' })));
+    } else {
+      host.append(...(foods.length ? foods.map((f) => foodRow(f, null)) : [hint(`No USDA branded results for "${q}".`)]), h('p', { class: 'credit' }, 'Data: USDA FoodData Central (public domain)'));
+    }
+    host.append(button('Search Open Food Facts too', (e) => searchOFFInto(my, q, e.currentTarget), { variant: 'secondary', cls: 'off-btn' }));
+  }
+
+  /** Open Food Facts, only on request: slower and often busy, so it gets one automatic retry before showing an error. */
+  async function searchOFFInto(my, q, btn) {
+    const box = h('div', { class: 'off-results' }, h('p', { class: 'muted res-hint load' }, spinner('Searching Open Food Facts'), ' Searching Open Food Facts…'));
+    btn.replaceWith(box);
+    try {
+      const foods = await searchOFFWithRetry(q, { signal: onlineCtl ? onlineCtl.signal : undefined });
+      if (my !== seq) return;
+      box.replaceChildren(...(foods.length ? foods.map((f) => foodRow(f, null)) : [hint(`No Open Food Facts results for "${q}".`)]), h('p', { class: 'credit' }, 'Data: Open Food Facts (ODbL)'));
+    } catch (e) {
+      if (my !== seq || e.kind === 'aborted') return;
+      box.replaceChildren(notice(describeError(e, 'Open Food Facts'), 'warn', button('Retry', (ev) => searchOFFInto(my, q, ev.currentTarget.closest('.off-results')), { variant: 'ghost' })));
+    }
   }
 
   async function lookup(code) {

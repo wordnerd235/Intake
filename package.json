@@ -1,0 +1,10 @@
+{
+  "name": "intake",
+  "private": true,
+  "type": "module",
+  "description": "Intake - local-first calorie and nutrition diary (no build step).",
+  "scripts": {
+    "test": "node --test tests/unit/*.test.js",
+    "e2e": "python3 tests/e2e/run.py"
+  }
+}

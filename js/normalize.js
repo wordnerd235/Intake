@@ -211,3 +211,24 @@ export function sameBarcode(a, b) {
   const y = String(b || '').replace(/^0+/, '');
   return !!x && x === y;
 }
+
+/**
+ * The product barcode a Food came from, or '' (Open Food Facts keys carry it; USDA branded foods keep it as gtin).
+ * @param {{key?:string, gtin?:string, barcode?:string}} food
+ */
+export function barcodeOfFood(food) {
+  if (!food) return '';
+  if (food.barcode) return String(food.barcode);
+  if (food.gtin) return String(food.gtin);
+  const m = /^off:(\d{6,14})$/.exec(food.key || '');
+  return m ? m[1] : '';
+}
+
+/**
+ * The user's own food saved for this barcode (a corrected copy of a scanned product), if any.
+ * @param {Array<{barcode?:string}>} customs live custom foods
+ * @param {string} code
+ */
+export function customForBarcode(customs, code) {
+  return (customs || []).find((c) => c.barcode && sameBarcode(c.barcode, code)) || null;
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeOFF, normalizeFDC, offNutrients, fdcNutrients, tidyName, convertMass, sameBarcode, textOf } from '../../js/normalize.js';
+import { normalizeOFF, normalizeFDC, offNutrients, fdcNutrients, tidyName, convertMass, sameBarcode, textOf, barcodeOfFood, customForBarcode } from '../../js/normalize.js';
 import { NUTRIENTS } from '../../js/nutrition.js';
 
 const near = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, `${a} !~ ${b}`);
@@ -140,4 +140,20 @@ test('FDC: the OpenAPI field name "number" works like nutrientNumber; ml serving
   const f = normalizeFDC({ fdcId: 7, description: 'Juice', foodNutrients: [{ nutrientNumber: '208', unitName: 'KCAL', value: 45 }], servingSize: 240, servingSizeUnit: 'ml', householdServingFullText: '1 cup' });
   assert.equal(f.servings[0].label, '1 cup (240 ml, about 240 g)');
   assert.equal(f.servings[0].grams, 240);
+});
+
+test('barcodeOfFood reads the barcode from an OFF key, a USDA gtin or a saved custom food', () => {
+  assert.equal(barcodeOfFood({ key: 'off:0016000504622' }), '0016000504622');
+  assert.equal(barcodeOfFood({ key: 'fdc:2339095', gtin: '00850791002352' }), '00850791002352');
+  assert.equal(barcodeOfFood({ key: 'custom:x', barcode: '123456789012' }), '123456789012');
+  assert.equal(barcodeOfFood({ key: 'usda:173944' }), '');
+  assert.equal(barcodeOfFood({ key: 'off:abc' }), '');
+  assert.equal(barcodeOfFood(null), '');
+});
+
+test('customForBarcode finds a corrected copy, ignoring leading zeros', () => {
+  const customs = [{ id: 'a', name: 'No code' }, { id: 'b', name: 'Fixed bar', barcode: '016000504622' }];
+  assert.equal(customForBarcode(customs, '0016000504622').id, 'b');
+  assert.equal(customForBarcode(customs, '99999999'), null);
+  assert.equal(customForBarcode([], '016000504622'), null);
 });

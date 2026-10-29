@@ -384,6 +384,7 @@ export function customAsFood(cf) {
     source: 'custom',
     per100g: cf.per100g || null,
     servings: cf.servings && cf.servings.length ? cf.servings : [],
+    ...(cf.barcode ? { barcode: cf.barcode } : {}),
   };
 }
 
@@ -432,15 +433,17 @@ export function rebalance(pct, key, value) {
 
 /**
  * Build the stored custom-food shape from form values.
- * @param {{name:string, brand:string, label:string, grams:number|null, per:Object}} v
+ * @param {{name:string, brand:string, label:string, grams:number|null, per:Object, barcode?:string}} v
  */
 export function buildCustomFood(v) {
   const per = { ...emptyNutrients(), ...v.per };
   const grams = v.grams && v.grams > 0 ? v.grams : null;
+  const barcode = String(v.barcode || '').replace(/\D/g, '');
   return {
     name: v.name.trim(),
     brand: v.brand.trim(),
     per100g: grams ? scaleNutrients(per, 100 / grams) : null,
     servings: [{ label: v.label.trim() || '1 serving', grams, per }],
+    ...(barcode ? { barcode } : {}),
   };
 }

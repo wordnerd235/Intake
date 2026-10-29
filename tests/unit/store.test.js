@@ -137,6 +137,9 @@ test('custom foods, recipes, meals CRUD', async () => {
   await s.saveCustomFood({ ...cf, name: 'Protein bar v2' });
   assert.equal((await s.listCustomFoods()).length, 1);
   assert.equal((await s.getCustomFood(cf.id)).name, 'Protein bar v2');
+  const fixed = await s.saveCustomFood({ name: 'Scanned bar', barcode: '0016000504622x', servings: [{ label: '1 bar', grams: 40, per: { kcal: 150 } }] });
+  assert.equal((await s.getCustomFood(fixed.id)).barcode, '0016000504622', 'barcode kept, digits only');
+  await s.deleteCustomFood(fixed.id);
 
   const r = await s.saveRecipe({ name: 'Oats', servings: 2, cookedGrams: 400, ingredients: [{ foodKey: 'usda:1', name: 'Banana', serving: { label: '1 medium', grams: 118 }, qty: 2, per: { kcal: 100 } }] });
   assert.equal(r.ingredients[0].qty, 2);

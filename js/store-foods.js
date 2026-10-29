@@ -45,7 +45,8 @@ export function createFoodStore(c) {
         const servings = (food.servings || []).map(cleanServing);
         if (!servings.length && !food.per100g) throw new Error('Add at least one serving');
         const id = food.id || mkId();
-        const rec = { id, name, brand: str(food.brand), per100g: food.per100g ? sanitizeNutrients(food.per100g) : null, servings };
+        const barcode = String(food.barcode || '').replace(/\D/g, '').slice(0, 14);
+        const rec = { id, name, brand: str(food.brand), per100g: food.per100g ? sanitizeNutrients(food.per100g) : null, servings, ...(barcode ? { barcode } : {}) };
         const out = await write('customFoods', rec, await adapter.get('customFoods', id));
         await refreshSnapshot(`custom:${id}`, { key: `custom:${id}`, name, brand: rec.brand, source: 'custom', per100g: rec.per100g, servings });
         return out;

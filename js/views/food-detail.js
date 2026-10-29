@@ -3,7 +3,9 @@
 import { h, sheet, select, numInput, field, button, icon, toast } from '../ui.js';
 import { store } from '../store.js';
 import { resolveFood } from '../foods-db.js';
-import { servingOptions, perForServing, scaleNutrients, servingText } from '../nutrition.js';
+import { servingOptions, perForServing, scaleNutrients, servingText, customAsFood } from '../nutrition.js';
+import { barcodeOfFood } from '../normalize.js';
+import { openFoodEditor } from './food-editor.js';
 import { factsPanel } from '../facts.js';
 import { starIcon } from '../facts.js';
 import { mealLabel } from '../components.js';
@@ -141,6 +143,35 @@ export async function openFoodDetail(o) {
     if (o.onDone) o.onDone(rec);
   }
 
+  /**
+   * Numbers wrong? Save a corrected copy as the user's own food (kept with the product's barcode so the next scan
+   * finds it), or edit the user's own food in place, then reopen this sheet on the corrected food.
+   */
+  async function fixNutrition() {
+    const onSaved = async (rec) => {
+      s.close();
+      const fixed = customAsFood(rec);
+      if (mode !== 'edit') { openFoodDetail({ ...o, food: fixed }); return; }
+      const sv = fixed.servings[0];
+      const e = o.entry;
+      const sameUnit = cleanLabel(sv.label) === cleanLabel(e.serving.label);
+      const qtyNow = !sameUnit && e.serving.grams && sv.grams ? Math.round(((e.qty * e.serving.grams) / sv.grams) * 100) / 100 : e.qty;
+      const entry = await store.updateLog(e.id, { foodKey: fixed.key, name: fixed.name, brand: fixed.brand, serving: { label: sv.label, grams: sv.grams ?? null }, per: perForServing(fixed, sv), qty: qtyNow });
+      toast('Entry updated');
+      if (o.onDone) o.onDone();
+      openFoodDetail({ ...o, entry });
+    };
+    const id = food.source === 'custom' && /^custom:/.test(food.key) ? food.key.slice(7) : null;
+    const own = id ? await store.getCustomFood(id) : null;
+    if (own) { openFoodEditor({ food: own, onSaved }); return; }
+    const base = options.find((x) => x.label !== 'g' && x.label !== 'oz') || options[idx]; // the package serving, not "g"
+    openFoodEditor({
+      title: 'Fix nutrition', onSaved,
+      prefill: { name: food.name, brand: food.brand || '', label: cleanLabel(base.label), grams: base.grams ?? null, per: perForServing(food, base), barcode: barcodeOfFood(food) },
+    });
+  }
+  const fixBtn = food.source === 'recipe' ? null : button(food.source === 'custom' && /^custom:/.test(food.key) ? 'Edit this food' : 'Numbers wrong? Fix nutrition', () => fixNutrition(), { variant: 'ghost', cls: 'fix-btn', ic: 'edit' });
+
   const del = mode === 'edit' ? button('Delete', async () => {
     const prev = await store.deleteLog(o.entry.id);
     s.close();
@@ -156,6 +187,7 @@ export async function openFoodDetail(o) {
     chips, err,
     mode === 'pick' ? null : h('div', { class: 'two-up' }, field('Meal', mealSel), field('Date', dateIn)),
     facts,
+    fixBtn,
   ];
   const s = sheet({ title: o.title || food.name, size: 'md', content: body, footer: h('div', { class: 'btn-row' }, del, primary) });
   update();

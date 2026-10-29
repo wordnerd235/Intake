@@ -4,6 +4,7 @@ import { store } from '../store.js';
 import { loadFoods, searchLocal, resolveFood } from '../foods-db.js';
 import { buildIndex, searchIndex } from '../foods-search.js';
 import { searchOFFWithRetry, searchFDC, barcodeOFF, barcodeFDC, describeError } from '../online-foods.js';
+import { customForBarcode } from '../normalize.js';
 import { servingOptions, perForServing, customAsFood, recipeAsFood, mealTotals, emptyNutrients, servingText } from '../nutrition.js';
 import { mealLabel, notice } from '../components.js';
 import { starIcon } from '../facts.js';
@@ -266,6 +267,8 @@ export async function openAddFood(o = {}) {
 
   async function lookup(code) {
     results.replaceChildren(section(null, h('p', { class: 'muted res-hint' }, spinner('Looking up'), ` Looking up ${code}…`)));
+    const mine = customForBarcode(await store.listCustomFoods(), code); // a copy the user corrected wins over the databases
+    if (mine) { run(); return openDetail(customAsFood(mine)); }
     let found = null;
     let reason = 'not-found';
     let name = '';

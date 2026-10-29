@@ -50,3 +50,9 @@ test('buildCustomFood without a weight keeps only the per-serving numbers', () =
   assert.equal(f.servings[0].label, '1 bowl');
   assert.equal(f.servings[0].per.kcal, 350);
 });
+
+test('buildCustomFood keeps a scanned barcode (digits only) so the next scan finds the corrected food', () => {
+  const f = buildCustomFood({ name: 'Chewy bar', brand: 'Fiber One', label: '1 bar', grams: 40, per: { kcal: 150 }, barcode: ' 0016000504622 ' });
+  assert.equal(f.barcode, '0016000504622');
+  assert.equal('barcode' in buildCustomFood({ name: 'x', brand: '', label: '', grams: null, per: { kcal: 1 } }), false);
+});

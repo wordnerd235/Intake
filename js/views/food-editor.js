@@ -8,16 +8,20 @@ const MAIN = ['kcal', 'protein', 'carbs', 'fat'];
 const MORE = NUTRIENTS.filter((k) => !MAIN.includes(k));
 
 /**
- * @param {{food?:Object|null, prefill?:{name?:string}, onSaved?:(rec:Object)=>void, onDeleted?:()=>void}} o
+ * Create or edit a custom food. `prefill` starts a new food from known values (e.g. correcting a scanned product);
+ * its barcode is kept so the next scan of that product finds this copy.
+ * @param {{food?:Object|null, prefill?:{name?:string, brand?:string, label?:string, grams?:number|null, per?:Object, barcode?:string}, title?:string, onSaved?:(rec:Object)=>void, onDeleted?:()=>void}} o
  */
 export function openFoodEditor(o = {}) {
   const f = o.food || null;
+  const pre = o.prefill || {};
   const sv = f && f.servings && f.servings[0];
-  const startPer = sv ? (sv.per || (f.per100g && sv.grams ? scaleNutrients(f.per100g, sv.grams / 100) : {})) : {};
-  const name = h('input', { class: 'input', id: 'fe-name', maxlength: 120, autocomplete: 'off', value: f ? f.name : (o.prefill && o.prefill.name) || '', 'aria-required': 'true' });
-  const brand = h('input', { class: 'input', id: 'fe-brand', maxlength: 80, autocomplete: 'off', value: f ? f.brand || '' : '' });
-  const label = h('input', { class: 'input', id: 'fe-label', maxlength: 80, autocomplete: 'off', value: sv ? sv.label : '1 serving' });
-  const grams = numInput({ value: sv ? sv.grams : null, label: 'Serving weight in grams', name: 'Serving weight', unit: 'g', id: 'fe-grams', dp: 1, max: MAX_GRAMS });
+  const startPer = sv ? (sv.per || (f.per100g && sv.grams ? scaleNutrients(f.per100g, sv.grams / 100) : {})) : pre.per || {};
+  const barcode = f ? f.barcode || '' : pre.barcode || '';
+  const name = h('input', { class: 'input', id: 'fe-name', maxlength: 120, autocomplete: 'off', value: f ? f.name : pre.name || '', 'aria-required': 'true' });
+  const brand = h('input', { class: 'input', id: 'fe-brand', maxlength: 80, autocomplete: 'off', value: f ? f.brand || '' : pre.brand || '' });
+  const label = h('input', { class: 'input', id: 'fe-label', maxlength: 80, autocomplete: 'off', value: sv ? sv.label : pre.label || '1 serving' });
+  const grams = numInput({ value: sv ? sv.grams : pre.grams ?? null, label: 'Serving weight in grams', name: 'Serving weight', unit: 'g', id: 'fe-grams', dp: 1, max: MAX_GRAMS });
   const nums = {};
   for (const k of NUTRIENTS) nums[k] = numInput({ value: startPer[k] ?? null, label: NUTRIENT_INFO[k].label, unit: NUTRIENT_INFO[k].unit, allowZero: true, dp: 2, id: `fe-${k}`, max: maxForUnit(NUTRIENT_INFO[k].unit) });
   const err = h('div', { class: 'field-error', role: 'alert' });
@@ -35,7 +39,7 @@ export function openFoodEditor(o = {}) {
     if (per.kcal == null) { err.textContent = 'Calories are required (use 0 if there are none).'; nums.kcal.input.focus(); return; }
     if (grams.raw().trim() && grams.get() == null) { err.textContent = grams.problem() || 'Serving weight must be a number of grams.'; grams.input.focus(); return; }
     try {
-      const rec = await store.saveCustomFood({ ...(f ? { id: f.id } : {}), ...buildCustomFood({ name: name.value, brand: brand.value, label: label.value, grams: grams.get(), per }) });
+      const rec = await store.saveCustomFood({ ...(f ? { id: f.id } : {}), ...buildCustomFood({ name: name.value, brand: brand.value, label: label.value, grams: grams.get(), per, barcode }) });
       s.close();
       toast(f ? 'Food updated' : 'Food saved');
       if (o.onSaved) o.onSaved(rec);
@@ -53,8 +57,9 @@ export function openFoodEditor(o = {}) {
 
   const grid = (keys) => h('div', { class: 'grid-fields' }, keys.map((k) => field(`${NUTRIENT_INFO[k].label}${k === 'kcal' ? ' *' : ''}`, nums[k].el)));
   const s = sheet({
-    title: f ? 'Edit food' : 'Create food', size: 'md',
+    title: o.title || (f ? 'Edit food' : 'Create food'), size: 'md',
     content: [
+      barcode ? h('p', { class: 'muted small' }, `Barcode ${barcode}: scanning it again will use this food.`) : null,
       field('Name *', name), field('Brand (optional)', brand),
       h('div', { class: 'two-up' }, field('Serving name', label, 'e.g. 1 bar, 1 cup, 2 slices'), field('Serving weight (optional)', grams.el, 'Grams. Lets you log by g or oz.')),
       h('h3', { class: 'sub-head' }, 'Nutrition per serving'), grid(MAIN),

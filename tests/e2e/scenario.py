@@ -578,6 +578,12 @@ class Scenario:
         expect(p.locator(".ntable-legend").last).to_have_text("≥ means some logged foods have no data for that nutrient")
         expect(p.locator(".ntable").last).to_contain_text("≥")
         self.close_sheets()
+        # the same table opens from Today, one tap from the home screen
+        self.goto("#/today")
+        p.get_by_role("button", name="All nutrients").click()
+        expect(p.locator(".sheet .ntable")).to_be_visible()
+        expect(p.locator(".sheet-title").last).to_contain_text("Nutrients")
+        self.close_sheets()
 
     def online_search_and_barcode(self):
         p = self.page

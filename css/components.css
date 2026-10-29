@@ -135,6 +135,7 @@ input[type="date"].input { min-width: 0; }
 .facts-rule { height: 4px; background: var(--ink); margin: 4px 0 2px; border-radius: 1px; }
 .facts-host { margin-top: 4px; }
 .fix-btn { margin-top: 8px; align-self: flex-start; }
+.nutrients-btn { margin-top: 12px; }
 
 /* ---- notices / empty / lists ---- */
 .notice { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--accent-soft); border: 1px solid transparent; font-size: 14.5px; line-height: 1.4; }

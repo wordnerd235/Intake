@@ -4,7 +4,7 @@ import { bus } from '../bus.js';
 import { store } from '../store.js';
 import { getDate } from '../state.js';
 import { loadDay } from '../day.js';
-import { dateNav, card, entryRow, mealLabel } from '../components.js';
+import { dateNav, card, entryRow, mealLabel, openNutrientsSheet } from '../components.js';
 import { macroBars, nutrientsTable, fmtNutrient } from '../facts.js';
 import { ring } from '../charts.js';
 import { addDays, today, formatDate } from '../dates.js';
@@ -141,10 +141,6 @@ function summary(d) {
   ];
 }
 
-function nutrientsSheet(d) {
-  sheet({ title: `Nutrients · ${formatDate(d.date, today())}`, size: 'md', content: [nutrientsTable(d.total, d.unknown, d.targets)] });
-}
-
 /** @param {HTMLElement} root */
 export async function mount(root) {
   let alive = true;
@@ -165,7 +161,7 @@ export async function mount(root) {
     const totals = card(null, [
       h('div', { class: 'totals' }, h('div', null, h('div', { class: 'muted small' }, 'Day total'), h('div', { class: 'big-val' }, h('span', { class: 'num' }, fmtInt(d.eaten)), h('span', { class: 'big-of' }, ` of ${fmtInt(d.budget.budget)} kcal`))), h('div', { class: `rem num${d.budget.over ? ' over' : ''}` }, d.budget.over ? `${fmtInt(-d.budget.remaining)} over` : `${fmtInt(d.budget.remaining)} left`)),
       h('p', { class: 'muted small num' }, `P ${fmtNutrient('protein', d.total.protein)} g · C ${fmtNutrient('carbs', d.total.carbs)} g · F ${fmtNutrient('fat', d.total.fat)} g`),
-      button('Nutrients', () => nutrientsSheet(d), { variant: 'secondary', ic: 'list', cls: 'only-narrow' }),
+      button('Nutrients', () => openNutrientsSheet(d), { variant: 'secondary', ic: 'list', cls: 'only-narrow' }),
     ], { cls: 'totals-card' });
     cols.replaceChildren(
       h('div', { class: 'col' }, d.byMeal.map((m) => mealCard(d, m)), exerciseCard(d), waterNoteCard(d), totals),

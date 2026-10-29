@@ -1,10 +1,11 @@
 // components.js - shared UI pieces: date navigator, log entry row, small cards.
-import { h, icon, iconButton } from './ui.js';
+import { h, icon, iconButton, sheet } from './ui.js';
 import { bus } from './bus.js';
 import { getDate, setDate } from './state.js';
 import { today, addDays, formatDate, relativeLabel } from './dates.js';
 import { entryTotal, servingText } from './nutrition.js';
 import { formatQty, fmtInt, shortLabel } from './units.js';
+import { nutrientsTable } from './facts.js';
 
 /** Meal name from settings with a safe fallback. */
 export const mealLabel = (settings, i) => (settings.mealNames && settings.mealNames[i]) || ['Breakfast', 'Lunch', 'Dinner', 'Snacks'][i] || `Meal ${i + 1}`;
@@ -61,4 +62,12 @@ export function card(title, children, { cls = '', right = null } = {}) {
 /** Inline notice (info / warn). */
 export function notice(text, kind = 'info', action = null) {
   return h('div', { class: `notice ${kind}`, role: kind === 'warn' ? 'alert' : 'note' }, icon(kind === 'warn' ? 'alert' : 'info', 18), h('span', null, text), action);
+}
+
+/**
+ * The full Nutrients table for a day, in a sheet (opened from Today and, on phones, from the Diary).
+ * @param {{date:string, total:Object, unknown:Object, targets:Object}} d a loaded day
+ */
+export function openNutrientsSheet(d) {
+  sheet({ title: `Nutrients · ${formatDate(d.date, today())}`, size: 'md', content: [nutrientsTable(d.total, d.unknown, d.targets)] });
 }

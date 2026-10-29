@@ -4,7 +4,7 @@ import { bus } from '../bus.js';
 import { store } from '../store.js';
 import { getDate } from '../state.js';
 import { loadDay } from '../day.js';
-import { dateNav, card, notice, mealLabel } from '../components.js';
+import { dateNav, card, notice, mealLabel, openNutrientsSheet } from '../components.js';
 import { macroBars } from '../facts.js';
 import { ring, sparkline } from '../charts.js';
 import { trendSeries } from '../nutrition.js';
@@ -112,7 +112,7 @@ export async function mount(root) {
     const n = calcStreak(logged, today());
     const streakCard = card(null, h('div', { class: 'streak' }, icon('flame', 22), h('div', null, h('strong', { class: 'num' }, `${n} ${n === 1 ? 'day' : 'days'} logged`), h('div', { class: 'muted small' }, n ? 'in a row' : 'Log a meal today to start a streak'))), { cls: 'streak-card' });
     cols.replaceChildren(
-      h('div', { class: 'col' }, ringCard(d), card('Macros', macroBars(d.total, d.targets)), mealsCard(d)),
+      h('div', { class: 'col' }, ringCard(d), card('Macros', [macroBars(d.total, d.targets), button('All nutrients', () => openNutrientsSheet(d), { variant: 'secondary', ic: 'list', cls: 'nutrients-btn' })]), mealsCard(d)),
       h('div', { class: 'col' }, waterCard(d), weightCard(d), streakCard, noteCard(d)),
     );
   };

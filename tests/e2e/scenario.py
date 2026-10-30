@@ -350,6 +350,29 @@ class Scenario:
         p.get_by_role("button", name="Previous day").click()
         expect(p.locator(".totals .big-val .num")).to_have_text(str(int(total)))
 
+    def copy_one_entry(self):
+        p = self.page
+        self.goto("#/diary")
+        banana = p.locator(".entry", has_text="Bananas, raw")
+        n = banana.count()
+        assert n > 0
+        banana.first.click()
+        p.locator(".sheet-foot").last.get_by_role("button", name="Copy").click()
+        expect(p.locator(".sheet-title").last).to_have_text("Copy to another day")
+        p.locator("#ce-date").fill("2026-10-01")
+        p.select_option("#ce-meal", index=3)  # Snacks
+        p.locator(".sheet-foot").last.get_by_role("button", name="Copy").click()
+        expect(p.locator(".toast-msg")).to_contain_text("Copied to")
+        expect(p.locator(".sheet")).to_have_count(0)
+        expect(banana).to_have_count(n)  # the original stays put
+        p.locator("input.datenav-input").evaluate("e => { e.value = '2026-10-01'; e.dispatchEvent(new Event('change')); }")
+        snacks = p.locator("section.meal").nth(3)
+        expect(snacks.locator(".entry", has_text="Bananas, raw")).to_have_count(1)
+        p.locator(".toast-action").click()  # Undo removes the copy
+        expect(p.locator(".entry", has_text="Bananas, raw")).to_have_count(0)
+        p.locator(".datenav .chip", has_text="Today").click()
+        expect(banana).to_have_count(n)
+
     def amount_limits(self):
         p = self.page
         self.goto("#/diary")
@@ -904,7 +927,7 @@ class Scenario:
             ("delete entry and Undo", self.delete_and_undo), ("quick add", self.quick_add), ("create custom food and log it", self.custom_food),
             ("create recipe and log a serving", self.recipe), ("exercise raises remaining", self.exercise), ("water and weight", self.water_and_weight),
             ("date navigation", self.date_navigation), ("copy meal from yesterday (+Undo)", self.copy_meal_from_yesterday),
-            ("copy whole day (+Undo)", self.copy_whole_day), ("amount limits", self.amount_limits), ("number fields have ceilings and say which", self.number_caps),
+            ("copy whole day (+Undo)", self.copy_whole_day), ("copy one entry to another day (+Undo)", self.copy_one_entry), ("amount limits", self.amount_limits), ("number fields have ceilings and say which", self.number_caps),
             ("copy day into a filled day: add or replace", self.copy_day_into_filled_day), ("thousands separator: 1,200 is 1200", self.thousands_separator), ("toast clears the Add button", self.toast_clears_add_button), ("toasts: low with a sheet, auto-dismiss, cleared on navigation", self.toasts_behave),
             ("compact totals are plain, Nutrients table has the legend", self.compact_totals_are_plain),
             ("online search + barcode entry (mocked)", self.online_search_and_barcode), ("Progress charts with data", lambda: (self.seed_history(), self.progress())),

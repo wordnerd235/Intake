@@ -196,6 +196,21 @@ test('copyMeal / copyDay / clearMeal', async () => {
   assert.ok((await s.loggedDates('2026-10-01', '2026-10-31')).has('2026-10-22'));
 });
 
+test('copyLog copies one entry to another day and meal as a new row', async () => {
+  const { s } = mk();
+  const a = await s.addLog(entry({ date: '2026-10-22', meal: 0, name: 'A', qty: 2 }));
+  await s.addLog(entry({ date: '2026-10-22', meal: 0, name: 'B' }));
+  const c = await s.copyLog(a.id, '2026-10-25', 2);
+  assert.notEqual(c.id, a.id);
+  assert.deepEqual((await s.logsForDate('2026-10-25')).map((l) => [l.name, l.meal, l.qty]), [['A', 2, 2]]);
+  assert.equal((await s.logsForDate('2026-10-22')).length, 2, 'the original stays');
+  assert.deepEqual(c.per, a.per);
+  await s.deleteLog(c.id); // Undo
+  assert.equal((await s.logsForDate('2026-10-25')).length, 0);
+  await s.deleteLog(a.id);
+  await assert.rejects(() => s.copyLog(a.id, '2026-10-25', 0), /not found/);
+});
+
 test('copyDay can add to or replace what is already on the target day, and the replaced rows come back with restoreLog', async () => {
   const { s } = mk();
   await s.addLog(entry({ date: '2026-10-22', meal: 0, name: 'A' }));

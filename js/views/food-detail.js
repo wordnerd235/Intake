@@ -10,7 +10,7 @@ import { factsPanel } from '../facts.js';
 import { starIcon } from '../facts.js';
 import { mealLabel } from '../components.js';
 import { formatQty, shortLabel, parseAmount, amountProblem, ambiguousNumber, cleanLabel } from '../units.js';
-import { today } from '../dates.js';
+import { today, addDays, formatDate } from '../dates.js';
 
 const CHIPS = [['¼', 0.25], ['⅓', 1 / 3], ['½', 0.5], ['⅔', 2 / 3], ['¾', 0.75], ['1', 1], ['2', 2]];
 
@@ -172,6 +172,27 @@ export async function openFoodDetail(o) {
   }
   const fixBtn = food.source === 'recipe' ? null : button(food.source === 'custom' && /^custom:/.test(food.key) ? 'Edit this food' : 'Numbers wrong? Fix nutrition', () => fixNutrition(), { variant: 'ghost', cls: 'fix-btn', ic: 'edit' });
 
+  /** Copy this entry, as saved, to another day and meal (default: the next day, or today for a past day). Undo removes the copy. */
+  function copySheet() {
+    const e = o.entry;
+    let to = e.date < today() ? today() : addDays(e.date, 1);
+    let toMeal = e.meal;
+    const toDate = h('input', { type: 'date', class: 'input', id: 'ce-date', value: to, onchange: (ev) => { if (ev.target.value) to = ev.target.value; } });
+    const toMealSel = select([0, 1, 2, 3].map((i) => ({ value: i, label: mealLabel(settings, i) })), toMeal, (v) => { toMeal = +v; }, { id: 'ce-meal' });
+    const cs = sheet({
+      title: 'Copy to another day', size: 'sm',
+      content: [h('p', { class: 'muted' }, `${e.name}, ${servingText(e, formatQty)} from ${formatDate(e.date, today())}`), field('Copy to date', toDate), field('Into meal', toMealSel)],
+      footer: h('div', { class: 'btn-row' }, button('Copy', async () => {
+        const rec = await store.copyLog(e.id, to, toMeal);
+        cs.close();
+        s.close();
+        toast(`Copied to ${mealLabel(settings, toMeal)}, ${formatDate(to, today())}`, { action: 'Undo', onAction: () => store.deleteLog(rec.id) });
+        if (o.onDone) o.onDone();
+      }, { variant: 'primary' })),
+    });
+  }
+
+  const copy = mode === 'edit' ? button('Copy', () => copySheet(), { variant: 'ghost', ic: 'copy' }) : null;
   const del = mode === 'edit' ? button('Delete', async () => {
     const prev = await store.deleteLog(o.entry.id);
     s.close();
@@ -189,7 +210,7 @@ export async function openFoodDetail(o) {
     facts,
     fixBtn,
   ];
-  const s = sheet({ title: o.title || food.name, size: 'md', content: body, footer: h('div', { class: 'btn-row' }, del, primary) });
+  const s = sheet({ title: o.title || food.name, size: 'md', content: body, footer: h('div', { class: 'btn-row' }, del, copy, primary) });
   update();
   requestAnimationFrame(() => qtyIn.input.select());
   return s;

@@ -222,6 +222,14 @@ export function createStore({ adapter, bus = defaultBus, clock = Date.now, uuid:
       }),
 
     // ---- copy helpers ----
+    /** Copy one diary entry to a date and meal as a new row. Returns the new entry. */
+    copyLog: (id, toDate, toMeal) =>
+      mutate(async () => {
+        const src = await adapter.get('foodLogs', id);
+        if (!src || src.deleted) throw new Error('Entry not found');
+        const { createdAt, updatedAt, _dirty, ...rest } = src;
+        return write('foodLogs', { ...rest, id: mkId(), date: toDate, meal: Math.min(3, Math.max(0, toMeal | 0)), createdAt: clock() }, null);
+      }),
     copyMeal: (fromDate, meal, toDate, toMeal) =>
       mutate(async () => {
         const src = live(await adapter.byIndex('foodLogs', 'date', fromDate)).filter((r) => r.meal === meal).sort((a, b) => a.createdAt - b.createdAt);

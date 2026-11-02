@@ -153,6 +153,28 @@ export function searchIndex(index, query, { limit = 40 } = {}) {
   return hits.slice(0, limit).map(({ ref, score, name }) => ({ ref, score, name }));
 }
 
+/**
+ * Text a food is searched by: its name, then its brand as a last segment, so "great value" finds Great Value foods while a
+ * match in the name still ranks first.
+ * @param {{name:string, brand?:string}} f
+ * @returns {string}
+ */
+export const searchText = (f) => (f.brand && !tokenize(f.name).join(' ').includes(tokenize(f.brand).join(' ')) ? `${f.name}, ${f.brand}` : f.name);
+
+/**
+ * Order online results by how well name + brand match the query: full matches first (best first), then the rest in the
+ * order the server sent them (a server may match words we cannot see, like ingredients).
+ * @template {{name:string, brand?:string}} T
+ * @param {T[]} foods
+ * @param {string} q
+ * @returns {T[]}
+ */
+export function rankByNameAndBrand(foods, q) {
+  const hits = searchIndex(buildIndex(foods.map((f) => ({ name: searchText(f), ref: f }))), q, { limit: foods.length }).map((x) => x.ref);
+  const seen = new Set(hits);
+  return [...hits, ...foods.filter((f) => !seen.has(f))];
+}
+
 /** Score every entry that matches all query tokens (unsorted). */
 function rank(index, query, penalty = 0) {
   const words = tokenize(query);

@@ -2,7 +2,7 @@
 import { h, sheet, select, field, numInput, button, icon, iconButton, toast, spinner, debounce } from '../ui.js';
 import { store } from '../store.js';
 import { loadFoods, searchLocal, resolveFood } from '../foods-db.js';
-import { buildIndex, searchIndex } from '../foods-search.js';
+import { buildIndex, searchIndex, searchText, rankByNameAndBrand } from '../foods-search.js';
 import { searchOFFWithRetry, searchFDC, barcodeOFF, barcodeFDC, describeError } from '../online-foods.js';
 import { customForBarcode } from '../normalize.js';
 import { servingOptions, perForServing, customAsFood, recipeAsFood, mealTotals, emptyNutrients, servingText } from '../nutrition.js';
@@ -22,7 +22,7 @@ const TABS = [['all', 'All'], ['recent', 'Recent'], ['frequent', 'Frequent'], ['
 
 const rank = (items, q, limit = 30) => {
   if (!q) return items.slice(0, limit);
-  const idx = buildIndex(items.map((it) => ({ name: it.name, ref: it })));
+  const idx = buildIndex(items.map((it) => ({ name: searchText({ name: it.name, brand: it.food && it.food.brand }), ref: it }))); // the brand is searchable too
   return searchIndex(idx, q, { limit }).map((h2) => h2.ref);
 };
 
@@ -246,7 +246,7 @@ export async function openAddFood(o = {}) {
       const tip = settings.fdcApiKey ? '' : ' A free key from fdc.nal.usda.gov/api-key-signup removes the shared limit; add it in More.';
       host.append(notice(`${describeError(error, 'USDA')}${tip}`, 'warn', button('Retry', () => searchOnline(my, q, host), { variant: 'ghost' })));
     } else {
-      host.append(...(foods.length ? foods.map((f) => foodRow(f, null)) : [hint(`No USDA branded results for "${q}".`)]), h('p', { class: 'credit' }, 'Data: USDA FoodData Central (public domain)'));
+      host.append(...(foods.length ? rankByNameAndBrand(foods, q).map((f) => foodRow(f, null)) : [hint(`No USDA branded results for "${q}".`)]), h('p', { class: 'credit' }, 'Data: USDA FoodData Central (public domain)'));
     }
     host.append(button('Search Open Food Facts too', (e) => searchOFFInto(my, q, e.currentTarget), { variant: 'secondary', cls: 'off-btn' }));
   }
@@ -258,7 +258,7 @@ export async function openAddFood(o = {}) {
     try {
       const foods = await searchOFFWithRetry(q, { signal: onlineCtl ? onlineCtl.signal : undefined });
       if (my !== seq) return;
-      box.replaceChildren(...(foods.length ? foods.map((f) => foodRow(f, null)) : [hint(`No Open Food Facts results for "${q}".`)]), h('p', { class: 'credit' }, 'Data: Open Food Facts (ODbL)'));
+      box.replaceChildren(...(foods.length ? rankByNameAndBrand(foods, q).map((f) => foodRow(f, null)) : [hint(`No Open Food Facts results for "${q}".`)]), h('p', { class: 'credit' }, 'Data: Open Food Facts (ODbL)'));
     } catch (e) {
       if (my !== seq || e.kind === 'aborted') return;
       box.replaceChildren(notice(describeError(e, 'Open Food Facts'), 'warn', button('Retry', (ev) => searchOFFInto(my, q, ev.currentTarget.closest('.off-results')), { variant: 'ghost' })));

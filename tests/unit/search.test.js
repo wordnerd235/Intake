@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { tokenize, fold, buildIndex, searchIndex } from '../../js/foods-search.js';
+import { tokenize, fold, buildIndex, searchIndex, searchText, rankByNameAndBrand } from '../../js/foods-search.js';
 import { parseFoodsDoc, rowToFood } from '../../js/foods-db.js';
 import { shortLabel } from '../../js/units.js';
 
@@ -24,6 +24,24 @@ test('tokenize and fold', () => {
   assert.equal(fold('glass'), 'glass');
   assert.equal(fold('peas'), 'pea');
   assert.equal(fold('2'), '2');
+});
+
+test('brand search: the brand is searchable, a name match still ranks first, unmatched online rows keep their order', () => {
+  assert.equal(searchText({ name: 'Creamy peanut butter', brand: 'Great Value' }), 'Creamy peanut butter, Great Value');
+  assert.equal(searchText({ name: 'Kirkland almond milk', brand: 'Kirkland' }), 'Kirkland almond milk', 'a brand already in the name is not repeated');
+  assert.equal(searchText({ name: 'Apple' }), 'Apple');
+  const foods = [
+    { name: 'Peanut butter cups', brand: 'Reese' },
+    { name: 'Creamy peanut butter', brand: 'Great Value' },
+    { name: 'Vanilla wafers', brand: 'Great Value' },
+    { name: 'Value pack peanuts', brand: 'Planters' },
+  ];
+  assert.deepEqual(rankByNameAndBrand(foods, 'great value').slice(0, 2).map((f) => f.name).sort(), ['Creamy peanut butter', 'Vanilla wafers']);
+  assert.equal(rankByNameAndBrand(foods, 'great value peanut butter')[0].name, 'Creamy peanut butter');
+  assert.equal(rankByNameAndBrand(foods, 'reese')[0].name, 'Peanut butter cups');
+  assert.deepEqual(rankByNameAndBrand(foods, 'value').map((f) => f.name)[0], 'Value pack peanuts', 'a word in the name beats the same word in the brand');
+  assert.equal(rankByNameAndBrand(foods, 'zzz').length, 4, 'nothing is dropped');
+  assert.deepEqual(rankByNameAndBrand(foods, 'zzz'), foods);
 });
 
 test('every query token must prefix-match; digits match exactly', () => {

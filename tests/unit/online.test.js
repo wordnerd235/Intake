@@ -1,7 +1,7 @@
 // Online lookups: failure mapping and the two-host Open Food Facts search, with a fake fetch (no network).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getJson, searchOFF, searchOFFWithRetry, describeError, OnlineError } from '../../js/online-foods.js';
+import { getJson, searchOFF, searchOFFWithRetry, searchFDC, describeError, OnlineError } from '../../js/online-foods.js';
 
 const reply = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 const hit = (code, name) => ({ code, product_name: name, nutriments: { 'energy-kcal_100g': 120 } });
@@ -71,4 +71,22 @@ test('searchOFFWithRetry: cancelling during the pause stops without a second req
   setTimeout(() => ctl.abort(), 10);
   await assert.rejects(p, (e) => e.kind === 'aborted');
   assert.equal(fetchFn.calls.length, 1);
+});
+
+const fdcFood = (id, description, brandName) => ({ fdcId: id, description, brandName, servingSize: 32, servingSizeUnit: 'g', foodNutrients: [{ nutrientNumber: '208', unitName: 'KCAL', value: 590 }] });
+
+test('searchFDC: every word must match (name or brand); a multi-word query with no such match asks once more with any word', async () => {
+  const strict = script(reply(200, { foods: [fdcFood(1, 'CREAMY PEANUT BUTTER', 'GREAT VALUE')] }));
+  const foods = await searchFDC('great value peanut butter', 'k', { fetchFn: strict });
+  assert.equal(foods.length, 1);
+  assert.equal(foods[0].brand, 'Great Value');
+  assert.equal(strict.calls.length, 1);
+  assert.match(strict.calls[0], /requireAllWords=true/);
+  const loose = script(reply(200, { foods: [] }), reply(200, { foods: [fdcFood(2, 'PEANUT BUTTER', 'ACME')] }));
+  assert.equal((await searchFDC('acme peanut buttr', 'k', { fetchFn: loose })).length, 1);
+  assert.equal(loose.calls.length, 2);
+  assert.doesNotMatch(loose.calls[1], /requireAllWords/);
+  const one = script(reply(200, { foods: [] }), reply(200, { foods: [fdcFood(3, 'X', 'Y')] }));
+  assert.deepEqual(await searchFDC('zzqxvsingle', 'k', { fetchFn: one }), []);
+  assert.equal(one.calls.length, 1, 'a single word gets no second try: it would be the same search');
 });

@@ -211,6 +211,7 @@ class Scenario:
         expect(p.locator("#fe-name")).to_have_value("zzprotein")
         clean_text(p, "food editor")
         p.fill("#fe-name", "Protein bar")
+        p.fill("#fe-brand", "Zzbrandco")
         p.fill("#fe-label", "1 bar")
         p.fill("#fe-kcal", "200")
         p.fill("#fe-protein", "20")
@@ -222,6 +223,10 @@ class Scenario:
         self.open_add()
         self.search("protein bar")
         expect(p.locator(".sheet .res-name", has_text="Protein bar").first).to_be_visible()
+        self.search("zzbrandco")  # the brand alone finds it
+        expect(p.locator(".sheet .res-sec", has_text="Your foods").locator(".res-name", has_text="Protein bar")).to_be_visible()
+        self.search("zzbrandco prot")
+        expect(p.locator(".sheet .res-sec", has_text="Your foods").locator(".res-name", has_text="Protein bar")).to_be_visible()
         self.close_sheets()
 
     def recipe(self):

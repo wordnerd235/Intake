@@ -130,8 +130,13 @@ export async function searchFDC(q, apiKey, o = {}) {
   const k = apiKey || 'DEMO_KEY';
   const key = `fdc:${k === 'DEMO_KEY' ? 'demo' : 'key'}:${q.trim().toLowerCase().replace(/\s+/g, ' ')}`;
   if (cache.has(key)) return cache.get(key);
-  const j = await getJson(`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${encodeURIComponent(k)}&query=${encodeURIComponent(q)}&dataType=Branded&pageSize=20`, o);
-  return remember(key, (j && Array.isArray(j.foods) ? j.foods : []).map(normalizeFDC).filter(Boolean));
+  // Every word must match (in the description or the brand), so "great value peanut butter" is not 20 random peanut foods.
+  // When that finds nothing, ask once more with any word matching.
+  const url = (all) => `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${encodeURIComponent(k)}&query=${encodeURIComponent(q)}&dataType=Branded&pageSize=20${all ? '&requireAllWords=true' : ''}`;
+  const foods = (j) => (j && Array.isArray(j.foods) ? j.foods : []).map(normalizeFDC).filter(Boolean);
+  let out = foods(await getJson(url(true), o));
+  if (!out.length && q.trim().includes(' ')) out = foods(await getJson(url(false), o));
+  return remember(key, out);
 }
 
 /**

@@ -11,6 +11,7 @@ import { starIcon } from '../facts.js';
 import { openFoodDetail } from './food-detail.js';
 import { openFoodEditor } from './food-editor.js';
 import { openBarcodeSheet } from '../barcode.js';
+import { scanLabel } from '../label-scan.js';
 import { fmtInt, shortLabel, formatQty, cleanLabel, LIMITS } from '../units.js';
 import { today } from '../dates.js';
 
@@ -288,10 +289,20 @@ export async function openAddFood(o = {}) {
     results.replaceChildren(section(null, [notice(msg, 'warn'), h('div', { class: 'btn-row left' }, button('Create food', () => openFoodEditor({ prefill: { name }, onSaved: (rec) => openDetail(customAsFood(rec)) }), { variant: 'primary' }), button('Back to search', () => run(), { variant: 'ghost' }))]));
   }
 
+  /** Photo of a Nutrition Facts label -> a prefilled Create food to check, then the detail sheet to log it. */
+  function scanNewFood() {
+    const name = input.value.trim();
+    const create = (prefill, note) => openFoodEditor({ title: note ? 'Check the scanned label' : 'Create food', note, prefill, onSaved: (rec) => openDetail(customAsFood(rec)) });
+    scanLabel({
+      onManual: () => create({ name }),
+      onRead: (r) => create({ name, label: r.label, grams: r.grams, per: r.per }, `Read ${r.found.length} ${r.found.length === 1 ? 'value' : 'values'} from the label. Photos can be misread: check each number against the label, add the name, then save.`),
+    });
+  }
+
   const debRun = debounce(run, 150);
   input.addEventListener('input', () => { debRun(); });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); debRun.cancel(); forceOnline = true; run(); } });
-  const searchRow = h('div', { class: 'search-row' }, h('div', { class: 'search-box' }, icon('search', 18), input), iconButton('barcode', 'Scan a barcode', () => openBarcodeSheet({ onCode: lookup }), 'bordered'));
+  const searchRow = h('div', { class: 'search-row' }, h('div', { class: 'search-box' }, icon('search', 18), input), iconButton('barcode', 'Scan a barcode', () => openBarcodeSheet({ onCode: lookup }), 'bordered'), iconButton('label', 'Scan a nutrition label', () => scanNewFood(), 'bordered'));
   const footer = h('div', { class: 'btn-row split' },
     mode === 'log' ? button('Quick add', () => openQuickAdd({ date, meal, onDone: afterAdd }), { variant: 'secondary', ic: 'bolt' }) : null,
     button('Create food', () => openFoodEditor({ prefill: { name: input.value.trim() }, onSaved: (rec) => { openDetail(customAsFood(rec)); } }), { variant: 'secondary', ic: 'plus' }));

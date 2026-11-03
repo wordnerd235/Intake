@@ -10,7 +10,8 @@ const MORE = NUTRIENTS.filter((k) => !MAIN.includes(k));
 /**
  * Create or edit a custom food. `prefill` starts a new food from known values (e.g. correcting a scanned product);
  * its barcode is kept so the next scan of that product finds this copy.
- * @param {{food?:Object|null, prefill?:{name?:string, brand?:string, label?:string, grams?:number|null, per?:Object, barcode?:string}, title?:string, onSaved?:(rec:Object)=>void, onDeleted?:()=>void}} o
+ * `note` is shown at the top (e.g. "check what the label scan read") and opens More nutrients so every value can be checked.
+ * @param {{food?:Object|null, prefill?:{name?:string, brand?:string, label?:string, grams?:number|null, per?:Object, barcode?:string}, title?:string, note?:string, onSaved?:(rec:Object)=>void, onDeleted?:()=>void}} o
  */
 export function openFoodEditor(o = {}) {
   const f = o.food || null;
@@ -59,11 +60,12 @@ export function openFoodEditor(o = {}) {
   const s = sheet({
     title: o.title || (f ? 'Edit food' : 'Create food'), size: 'md',
     content: [
+      o.note ? h('p', { class: 'notice info fe-note' }, o.note) : null,
       barcode ? h('p', { class: 'muted small' }, `Barcode ${barcode}: scanning it again will use this food.`) : null,
       field('Name *', name), field('Brand (optional)', brand),
       h('div', { class: 'two-up' }, field('Serving name', label, 'e.g. 1 bar, 1 cup, 2 slices'), field('Serving weight (optional)', grams.el, 'Grams. Lets you log by g or oz.')),
       h('h3', { class: 'sub-head' }, 'Nutrition per serving'), grid(MAIN),
-      h('details', { class: 'more' }, h('summary', null, 'More nutrients'), grid(MORE)),
+      h('details', { class: 'more', open: !!o.note }, h('summary', null, 'More nutrients'), grid(MORE)),
       err,
     ],
     footer: h('div', { class: 'btn-row' }, del, button('Save food', save, { variant: 'primary', cls: 'grow' })),

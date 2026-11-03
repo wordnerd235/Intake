@@ -76,6 +76,17 @@ FDC_FOOD = {
 }
 
 
+LABEL_TEXT = "Nutrition Facts\\nServing size 2/3 cup (55g)\\nCalories 230\\nTotal Fat 8g 10%\\nSaturated Fat 1g 5%\\nSodium 160mg 7%\\nTotal Carbohydrate 37g 13%\\nDietary Fiber 49 14%\\nTotal Sugars 12g\\nIncludes 10g Added Sugars 20%\\nProtein 3g"
+# Stands in for Tesseract.js: "reads" LABEL_TEXT, or window.__ocrText when a test sets it.
+FAKE_TESSERACT = (
+    "window.Tesseract = { createWorker: async (lang, oem, o) => ({"
+    " recognize: async () => { o.logger({ status: 'recognizing text', progress: 0.5 }); return { data: { text: window.__ocrText ?? '" + LABEL_TEXT + "' } }; },"
+    " terminate: async () => {} }) };"
+)
+# A 1x1 PNG: enough for createImageBitmap
+TINY_PNG = bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000b49444154789c63f80f040009fb03fdfb5e6b2b0000000049454e44ae426082")
+
+
 class Net:
     """Collects every non-local request so tests can assert the app only talks to the mocked services."""
 
@@ -123,6 +134,8 @@ class Net:
                 name = url.rsplit("/", 1)[-1].split("?")[0]
                 if name in MODULES:
                     return route.fulfill(status=200, content_type="application/javascript", headers={"access-control-allow-origin": "*"}, body=MODULES[name])
+            if "unpkg.com/tesseract.js@" in url and url.endswith("tesseract.min.js"):
+                return route.fulfill(status=200, content_type="application/javascript", headers={"access-control-allow-origin": "*"}, body=FAKE_TESSERACT)
             if "unpkg.com" in url or "gstatic.com" in url:
                 return route.fulfill(status=200, content_type="application/javascript", headers={"access-control-allow-origin": "*"}, body="/* blocked in tests */")
             return route.fulfill(status=404, body="not mocked")

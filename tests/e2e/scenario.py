@@ -5,7 +5,7 @@ from pathlib import Path
 
 from playwright.sync_api import expect
 
-from helpers import SHOTS, Net, clean_text, num, overflow, small_targets
+from helpers import SHOTS, TINY_PNG, Net, clean_text, num, overflow, small_targets
 
 BANANA_KCAL = 105
 
@@ -227,6 +227,43 @@ class Scenario:
         expect(p.locator(".sheet .res-sec", has_text="Your foods").locator(".res-name", has_text="Protein bar")).to_be_visible()
         self.search("zzbrandco prot")
         expect(p.locator(".sheet .res-sec", has_text="Your foods").locator(".res-name", has_text="Protein bar")).to_be_visible()
+        self.close_sheets()
+
+    def scan_label(self):
+        p = self.page
+        photo = {"name": "label.png", "mimeType": "image/png", "buffer": TINY_PNG}
+        self.open_add()
+        # a photo the reader can't make sense of: say so, offer another try
+        p.evaluate("window.__ocrText = 'a blurry photo'")
+        with p.expect_file_chooser() as fc:
+            p.get_by_role("button", name="Scan a nutrition label").click()
+        fc.value.set_files(photo)
+        expect(p.locator(".scan-status")).to_contain_text("Couldn't read that label")
+        # a readable label: the numbers land in Create food, to be checked before saving
+        p.evaluate("delete window.__ocrText")
+        with p.expect_file_chooser() as fc:
+            p.get_by_role("button", name="Try again").click()
+        fc.value.set_files(photo)
+        expect(p.locator(".sheet-title").last).to_have_text("Check the scanned label")
+        expect(p.locator(".fe-note")).to_contain_text("check each number")
+        for sel, want in (("#fe-kcal", "230"), ("#fe-fat", "8"), ("#fe-satFat", "1"), ("#fe-sodium", "160"), ("#fe-carbs", "37"), ("#fe-fiber", "4"), ("#fe-sugar", "12"), ("#fe-protein", "3"), ("#fe-label", "2/3 cup"), ("#fe-grams", "55")):
+            expect(p.locator(sel)).to_have_value(want)
+        clean_text(p, "scanned label editor")
+        p.fill("#fe-name", "Scanned granola")
+        p.get_by_role("button", name="Save food").click()
+        expect(p.locator("#fd-qty")).to_be_visible()  # straight to logging it
+        expect(p.locator(".sheet-title").last).to_have_text("Scanned granola")
+        self.close_sheets()
+        # text copied from the photo (iPhone Live Text) can be pasted instead
+        self.open_add()
+        with p.expect_file_chooser():
+            p.get_by_role("button", name="Scan a nutrition label").click()
+        p.locator(".ls-paste summary").click()
+        p.fill("#ls-text", "Nutrition Facts\nServing size 1 bar (40g)\nCalories 190\nTotal Fat 7g 9%\nProtein 10g")
+        p.get_by_role("button", name="Use this text").click()
+        expect(p.locator("#fe-kcal")).to_have_value("190")
+        expect(p.locator("#fe-protein")).to_have_value("10")
+        expect(p.locator("#fe-label")).to_have_value("1 bar")
         self.close_sheets()
 
     def recipe(self):
@@ -936,7 +973,7 @@ class Scenario:
         for label, fn in (
             ("onboarding", self.onboarding), ("today starts empty", self.today_empty),
             ("search banana, add 1 medium = 105 kcal", self.search_banana_and_add), ("edit quantity (fractions, validation)", self.edit_quantity),
-            ("delete entry and Undo", self.delete_and_undo), ("quick add", self.quick_add), ("create custom food and log it", self.custom_food),
+            ("delete entry and Undo", self.delete_and_undo), ("quick add", self.quick_add), ("create custom food and log it", self.custom_food), ("scan a nutrition label into a new food", self.scan_label),
             ("create recipe and log a serving", self.recipe), ("exercise raises remaining", self.exercise), ("water and weight", self.water_and_weight),
             ("date navigation", self.date_navigation), ("copy meal from yesterday (+Undo)", self.copy_meal_from_yesterday),
             ("copy whole day (+Undo)", self.copy_whole_day), ("copy one entry to another day (+Undo)", self.copy_one_entry), ("amount limits", self.amount_limits), ("number fields have ceilings and say which", self.number_caps),

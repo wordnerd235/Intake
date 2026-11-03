@@ -13,6 +13,7 @@ const P = {
   calendar: '<rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/>',
   barcode: '<path d="M4 6v12M7 6v12M11 6v12M14 6v12M17.5 6v12M20 6v12"/>',
+  label: '<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8 7.5h8M8 11h8M8 14h5M8 17h6"/>',
   star: '<path d="m12 3.8 2.5 5.1 5.6.8-4 3.9.9 5.6-5-2.6-5 2.6.9-5.6-4-3.9 5.6-.8z"/>',
   starFill: '<path fill="currentColor" d="m12 3.8 2.5 5.1 5.6.8-4 3.9.9 5.6-5-2.6-5 2.6.9-5.6-4-3.9 5.6-.8z"/>',
   trash: '<path d="M5 7h14M10 7V4.5h4V7M7 7l.8 12.5h8.4L17 7M10 11v5M14 11v5"/>',

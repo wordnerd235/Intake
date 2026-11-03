@@ -30,8 +30,9 @@ export async function openMealPhoto({ date, meal, onDone }) {
     const keyIn = h('input', { class: 'input', id: 'mp-key', type: 'password', autocomplete: 'off', spellcheck: 'false', placeholder: 'Paste your key' });
     const err = h('div', { class: 'field-error', role: 'alert' });
     const save = async () => {
-      const k = keyIn.value.trim();
-      if (!/^[\w-]{20,}$/.test(k)) { err.textContent = 'That doesn\'t look like a Google API key (they start with "AIza").'; keyIn.focus(); return; }
+      const k = keyIn.value.replace(/\s+/g, '');
+      // Google decides whether a key is valid (key formats change); this only catches a partial or garbled paste.
+      if (!/^[\x21-\x7e]{20,}$/.test(k)) { err.textContent = 'That looks like only part of a key. Copy the whole key from Google and paste it again.'; keyIn.focus(); return; }
       settings = await store.saveSettings({ geminiApiKey: k });
       start();
     };

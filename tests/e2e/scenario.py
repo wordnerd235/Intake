@@ -305,11 +305,11 @@ class Scenario:
         photo = {"name": "plate.png", "mimeType": "image/png", "buffer": TINY_PNG}
         self.open_add()
         p.get_by_role("button", name="Estimate a meal from a photo").click()
-        # first time: it asks for the person's own Google key, and checks it looks like one
+        # first time: it asks for the person's own Google key; any whole key is taken (not only "AIza..." ones)
         p.fill("#mp-key", "not a key")
         p.get_by_role("button", name="Save key").click()
-        expect(p.locator(".sheet .field-error").last).to_contain_text("Google API key")
-        p.fill("#mp-key", "AIza" + "x" * 35)
+        expect(p.locator(".sheet .field-error").last).to_contain_text("part of a key")
+        p.fill("#mp-key", "AQ.Ab8RN6" + "x" * 30)
         p.get_by_role("button", name="Save key").click()
         clean_text(p, "meal photo start")
         # Google says no: the reason is shown, and another photo can be tried
@@ -343,7 +343,7 @@ class Scenario:
         assert self.day_total() == before
         # the key can be changed or removed in More
         self.goto("#/more")
-        expect(p.locator("#pf-gemini")).to_have_value("AIza" + "x" * 35)
+        expect(p.locator("#pf-gemini")).to_have_value("AQ.Ab8RN6" + "x" * 30)
 
     def recipe(self):
         p = self.page

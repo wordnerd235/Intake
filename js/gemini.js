@@ -56,7 +56,13 @@ export async function estimateMeal(photo, key, { signal, fetchFn = globalThis.fe
         if (signal && signal.aborted) throw new GeminiError('Cancelled');
         if (ctl.signal.aborted) throw new GeminiError('Gemini took too long to answer. Try again.');
         if (!simple) { simple = true; continue; }
-        throw new GeminiError(explainError(0, null).message);
+        // Both forms failed before any answer. A keyless GET tells a blocked network apart from Google refusing this
+        // request in a way the browser hides (Google answers a keyless call with a readable 403).
+        let reachable = false;
+        try { reachable = !!(await fetchFn(API.replace(/\/$/, ''), { credentials: 'omit' })).status; } catch { /* blocked */ }
+        throw new GeminiError(reachable
+          ? 'Google is reachable, but your phone stopped its answer to this request (code: blocked-answer). Try once on cellular; if it still fails, tell whoever helps you with Intake this code.'
+          : explainError(0, null).message);
       } finally {
         clearTimeout(timer);
         if (signal) signal.removeEventListener('abort', onAbort);

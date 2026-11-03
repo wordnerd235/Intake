@@ -65,7 +65,7 @@ async function load(onStatus) {
   return engine;
 }
 
-/** Draw the photo onto a canvas no larger than `side` on its longest edge (or exactly `w` x `h`). */
+/** Draw the photo (or a canvas) no larger than `side` on its longest edge (or exactly `w` x `h`); returns its pixels. */
 function draw(bmp, side, w, h) {
   const k = Math.min(1, side / Math.max(bmp.width, bmp.height));
   const c = document.createElement('canvas');
@@ -76,29 +76,54 @@ function draw(bmp, side, w, h) {
   return ctx.getImageData(0, 0, c.width, c.height);
 }
 
+const MEAN = [0.485, 0.456, 0.406];
+const STD = [0.229, 0.224, 0.225];
+
+/** Run the text detector on `img` scaled to `side` on its longest edge; boxes come back in the pixels of `scaleTo`. */
+async function detect({ ort, det }, img, side, scaleTo) {
+  const s = side / Math.max(img.width, img.height);
+  const dw = Math.max(32, Math.round((img.width * s) / 32) * 32);
+  const dh = Math.max(32, Math.round((img.height * s) / 32) * 32);
+  const small = draw(img, Infinity, dw, dh);
+  const x = new Float32Array(3 * dw * dh);
+  for (let i = 0, p = 0; p < dw * dh; i += 4, p++) for (let ch = 0; ch < 3; ch++) x[ch * dw * dh + p] = (small.data[i + ch] / 255 - MEAN[ch]) / STD[ch];
+  const out = await det.run({ [det.inputNames[0]]: new ort.Tensor('float32', x, [1, 3, dh, dw]) });
+  return boxesFromMap(out[det.outputNames[0]].data, dw, dh, scaleTo.width / dw, scaleTo.height / dh);
+}
+
+/**
+ * Download and start the reader ahead of time (the live label camera does this while the person lines up the shot).
+ * @param {(msg:string)=>void} [onStatus]
+ * @returns {Promise<void>}
+ */
+export async function warmUp(onStatus = () => {}) {
+  await load(onStatus);
+}
+
+/**
+ * Quick look for text in a camera frame: the detector alone, on a small copy. Fast enough to run a few times a second.
+ * @param {CanvasImageSource & {width:number, height:number}} frame
+ * @param {number} [side] longest side the detector sees
+ * @returns {Promise<Array<number[][]>>} text boxes [tl, tr, br, bl] in the frame's pixels
+ */
+export async function findText(frame, side = 480) {
+  return detect(await load(() => {}), frame, side, frame);
+}
+
 /**
  * Read all the text in a photo, as lines top to bottom.
- * @param {Blob} file
+ * @param {Blob|ImageBitmapSource} file a photo, or a canvas holding a camera frame
  * @param {(msg:string)=>void} [onStatus]
  * @returns {Promise<string>}
  */
 export async function recognizeText(file, onStatus = () => {}) {
-  const { ort, det, rec } = await load(onStatus);
+  const eng = await load(onStatus);
+  const { ort, rec } = eng;
   onStatus('Finding the text…');
   const bmp = await createImageBitmap(file);
   const src = draw(bmp, SRC_SIDE);
-  const s = DET_SIDE / Math.max(bmp.width, bmp.height);
-  const dw = Math.max(32, Math.round((bmp.width * s) / 32) * 32);
-  const dh = Math.max(32, Math.round((bmp.height * s) / 32) * 32);
-  const small = draw(bmp, Infinity, dw, dh);
+  const boxes = await detect(eng, bmp, DET_SIDE, src);
   if (bmp.close) bmp.close();
-  const mean = [0.485, 0.456, 0.406];
-  const std = [0.229, 0.224, 0.225];
-  const x = new Float32Array(3 * dw * dh);
-  for (let i = 0, p = 0; p < dw * dh; i += 4, p++) for (let ch = 0; ch < 3; ch++) x[ch * dw * dh + p] = (small.data[i + ch] / 255 - mean[ch]) / std[ch];
-  const detOut = await det.run({ [det.inputNames[0]]: new ort.Tensor('float32', x, [1, 3, dh, dw]) });
-  const map = detOut[det.outputNames[0]];
-  const boxes = boxesFromMap(map.data, dw, dh, src.width / dw, src.height / dh);
   const items = [];
   for (let i = 0; i < boxes.length; i++) {
     if (i % 4 === 0) onStatus(`Reading the label… ${Math.round((i / boxes.length) * 100)}%`);

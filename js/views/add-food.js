@@ -12,6 +12,7 @@ import { openFoodDetail } from './food-detail.js';
 import { openFoodEditor } from './food-editor.js';
 import { openBarcodeSheet } from '../barcode.js';
 import { scanLabel } from '../label-scan.js';
+import { openMealPhoto } from './meal-photo.js';
 import { fmtInt, shortLabel, formatQty, cleanLabel, LIMITS } from '../units.js';
 import { today } from '../dates.js';
 
@@ -302,7 +303,8 @@ export async function openAddFood(o = {}) {
   const debRun = debounce(run, 150);
   input.addEventListener('input', () => { debRun(); });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); debRun.cancel(); forceOnline = true; run(); } });
-  const searchRow = h('div', { class: 'search-row' }, h('div', { class: 'search-box' }, icon('search', 18), input), iconButton('barcode', 'Scan a barcode', () => openBarcodeSheet({ onCode: lookup }), 'bordered'), iconButton('label', 'Scan a nutrition label', () => scanNewFood(), 'bordered'));
+  const searchRow = h('div', { class: 'search-row' }, h('div', { class: 'search-box' }, icon('search', 18), input), iconButton('barcode', 'Scan a barcode', () => openBarcodeSheet({ onCode: lookup }), 'bordered'), iconButton('label', 'Scan a nutrition label', () => scanNewFood(), 'bordered'),
+    mode === 'log' ? iconButton('plate', 'Estimate a meal from a photo', () => openMealPhoto({ date, meal, onDone: afterAdd }), 'bordered') : null);
   const footer = h('div', { class: 'btn-row split' },
     mode === 'log' ? button('Quick add', () => openQuickAdd({ date, meal, onDone: afterAdd }), { variant: 'secondary', ic: 'bolt' }) : null,
     button('Create food', () => openFoodEditor({ prefill: { name: input.value.trim() }, onSaved: (rec) => { openDetail(customAsFood(rec)); } }), { variant: 'secondary', ic: 'plus' }));

@@ -1,6 +1,6 @@
 // facts.js - nutrient formatting + nutrition-facts / daily-nutrients tables + macro bars.
 import { h, icon } from './ui.js';
-import { NUTRIENTS, NUTRIENT_INFO } from './nutrition.js';
+import { NUTRIENTS, NUTRIENT_INFO, targetStatus } from './nutrition.js';
 import { fmtInt, trimNum } from './units.js';
 
 /**
@@ -69,10 +69,9 @@ export function nutrientsTable(total, unknown, targets) {
       const t = targets[k] || { value: null, kind: null };
       const v = total[k] || 0;
       const pct = t.value ? (v / t.value) * 100 : 0;
-      const over = t.kind === 'limit' && t.value && v > t.value;
-      const met = t.kind === 'goal' && t.value && pct >= 100;
-      const status = over ? 'over limit' : met ? 'goal met' : '';
-      return h('div', { class: `nrow${over ? ' is-over' : ''}${met ? ' is-met' : ''}`, role: 'row' },
+      const st = targetStatus(v, t, !!unknown[k]);
+      const status = { over: 'over limit', under: 'under limit', met: 'goal met' }[st] || '';
+      return h('div', { class: `nrow${st === 'over' ? ' is-over' : ''}${st === 'under' || st === 'met' ? ' is-met' : ''}`, role: 'row' },
         h('span', { class: 'nname', role: 'cell' }, NUTRIENT_INFO[k].label, t.kind === 'limit' ? h('small', null, ' limit') : null),
         h('span', { class: 'nval num r', role: 'cell' }, fmtNutrient(k, v, !!unknown[k], true)),
         h('span', { class: 'ntgt num r', role: 'cell' }, t.value ? `${t.kind === 'limit' ? '≤ ' : ''}${fmtNutrient(k, t.value)}` : '—'),

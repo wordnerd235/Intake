@@ -105,7 +105,7 @@ Settings `profile`: `units {weight:'lb'|'kg', height:'ftin'|'cm', water:'oz'|'ml
 - Pace choices in UI: 0.25/0.5/0.75/1 kg or 0.5/1/1.5/2 lb per week.
 - Daily budget = target + (addExerciseCalories ? exercise kcal : 0). Remaining = budget − food kcal.
 - Macro grams = target × pct / {4,4,9}; percentages must sum to 100 (UI enforces).
-- Default nutrient targets: fiber 14 g per 1000 kcal; sodium ≤ 2300 mg; satFat ≤ 10% kcal /9; sugar shown informational (no target); cholesterol ≤ 300 mg; potassium 3400 (m)/2600 (f); calcium 1000; iron 8 (m)/18 (f); vitA 900/700 µg; vitC 90/75 mg; vitD 15 µg. "≤" targets are limits (over = warning color); others are goals.
+- Default nutrient targets: fiber 14 g per 1000 kcal; sodium ≤ 2300 mg; satFat ≤ 10% kcal /9; sugar shown informational (no target); cholesterol ≤ 300 mg; potassium 3400 (m)/2600 (f); calcium 1000; iron 8 (m)/18 (f); vitA 900/700 µg; vitC 90/75 mg; vitD 15 µg. "≤" targets are limits (green while under, warning color once over; under is not claimed when some foods lack data); calories, carbs and fat are limits too. Others are goals (green once reached).
 - Exercise kcal = `MET × kg × minutes/60`, rounded; user may override.
 - Trend weight: exponential moving average, α = 0.1, over daily weigh-ins (carry forward across gaps). BMI = kg / m². Projection: goal date from trend slope over last 4 weeks (only if moving toward goal), else "—".
 

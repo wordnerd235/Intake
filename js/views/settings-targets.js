@@ -59,5 +59,5 @@ export function targetsSection(settings, kcal) {
     const kind = (d.kind || (k === 'sugar' || k === 'transFat' ? 'limit' : 'goal')) === 'limit' ? 'limit (stay under)' : 'goal (reach)';
     return h('div', { class: 'target-row' }, h('label', { for: `nt-${k}` }, info.label, h('small', null, ` ${kind}`)), inp.el);
   });
-  return h('details', { class: 'more' }, h('summary', null, 'Nutrient targets'), h('p', { class: 'muted small' }, 'Leave a box empty to use the default shown in grey. Limits turn red when exceeded; goals turn green when reached.'), h('div', { class: 'target-grid' }, rows));
+  return h('details', { class: 'more' }, h('summary', null, 'Nutrient targets'), h('p', { class: 'muted small' }, 'Leave a box empty to use the default shown in grey. Limits are green while you stay under and red once you go over; goals turn green when reached.'), h('div', { class: 'target-grid' }, rows));
 }

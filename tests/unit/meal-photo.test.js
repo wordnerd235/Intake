@@ -76,5 +76,5 @@ test('explainError: what each Google error means, and when the next model is wor
   assert.equal(explainError(503, null).tryNext, true);
   assert.equal(explainError(400, { error: { status: 'INVALID_ARGUMENT', message: 'Bad image' } }).tryNext, false);
   assert.match(explainError(0, null).message, /reach Google|offline/);
-  assert.match(explainError(401, { error: { message: 'API key not valid. Please pass a valid API key.', details: [{ reason: 'ACCESS_TOKEN_TYPE_UNSUPPORTED' }] } }).message, /kind of key/);
+  assert.match(explainError(401, { error: { message: 'API key not valid. Please pass a valid API key.', details: [{ reason: 'ACCESS_TOKEN_TYPE_UNSUPPORTED' }] } }).message, /didn't accept this key/);
 });

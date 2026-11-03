@@ -80,10 +80,11 @@ LABEL_TEXT = "Nutrition Facts\\nServing size 2/3 cup (55g)\\nCalories 230\\nTota
 # Stands in for the on-device reader (ppocr.js downloads ~25 MB of models): "reads" LABEL_TEXT, or window.__ocrText.
 FAKE_OCR = "window.__intakeTestOcr = async () => window.__ocrText ?? '" + LABEL_TEXT + "';"
 # A 1x1 PNG: enough for createImageBitmap
-# Camera stand-ins for the live label scanner: none at all, or a steady picture of printed label lines.
+# Camera stand-ins for the live label scanner: none at all, or printed label lines held by a slightly shaky hand.
 NO_CAMERA = "navigator.mediaDevices.getUserMedia = async () => { throw new DOMException('no camera', 'NotFoundError'); }; null"
 FAKE_CAMERA = """(() => { const c = document.createElement('canvas'); c.width = 720; c.height = 960; const x = c.getContext('2d');
   const draw = () => { x.fillStyle = '#fff'; x.fillRect(0, 0, 720, 960); x.fillStyle = '#111'; x.font = 'bold 34px sans-serif';
+    x.setTransform(1, 0, 0, 1, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
     ['Nutrition Facts', 'Serving size 2/3 cup (55g)', 'Calories 230', 'Total Fat 8g 10%', 'Sodium 160mg 7%', 'Total Carbohydrate 37g',
      'Dietary Fiber 4g 14%', 'Total Sugars 12g', 'Protein 3g', 'Vitamin D 2mcg 10%', 'Calcium 260mg 20%', 'Iron 8mg 45%']
       .forEach((t, i) => x.fillText(t, 60, 90 + i * 70)); };

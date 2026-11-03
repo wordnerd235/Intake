@@ -112,6 +112,7 @@ test('real phone photos (PaddleOCR output): two nutrients per line, glued words,
   const carton = parseNutritionLabel('Serving Size 1 carton 325mL) Corporation\nCalories 160\nTotal Fat 2.5g 3%\nProtein 30g 60%\nVit.D0mcg 0% . Calcium 390mg 30% COATED PAPER CARTON\nron1.4mg8%Potassum470mg10% PROTEINS ISA REGISTERED TRADEMARK.');
   assert.deepEqual(carton.per, { kcal: 160, fat: 2.5, protein: 30, vitD: 0, calcium: 390, iron: 1.4, potassium: 470 });
   assert.equal(carton.label, '1 carton', 'text read beside the label is not part of the serving');
+  assert.equal(parseNutritionLabel('Serving size 1Can (12noz)\nCalories 20').label, '1 can');
   const crackers = parseNutritionLabel('Amount per serving 140\nCalories\n% Daily Value*\nCholesterol <5mg 11%\nDietary Fiber<1g\nVitamin D Omcg 0%Calcium 40mg\nIron1.2mg\nThiamin 0.14mg 10%Riboflavin 0.14mg 10% 6%Potassium 50mg 0%');
   assert.deepEqual(crackers.per, { kcal: 140, cholesterol: 5, fiber: 1, vitD: 0, calcium: 40, iron: 1.2, potassium: 50 });
   const sweetener = parseNutritionLabel('Amo per serving In the remote mountain hig\nCa lories 0\nTotal Fat Og 0% and pure living.\nNot a significant source of saturated fat, and well-binargt\ntrans fathr "The Immortals\'Fruit."\nsugarsvitamin Dcalciumiron and');

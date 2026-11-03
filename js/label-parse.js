@@ -42,10 +42,54 @@ export function cleanLine(line) {
     .replace(/(\d)\s*meg\b/g, '$1mcg') // OCR reads "mcg" as "meg"
     .replace(/(\d)[o](?=\s*(?:m?c?g|µg|%|\b))/g, '$10') // "1o g" -> "10 g"
     .replace(/(^|\s)[o](?=\s*(?:m?c?g|µg)\b)/g, '$10') // "o g" -> "0 g"
+    .replace(/(^|\s)s(?=\s*(?:m?c?g|µg)\b)/g, '$15') // "smg" -> "5mg"
+    .replace(/(^|\s)0(\d)(?=\s*(?:m?c?g|µg)\b)/g, '$10.$2') // "07mg": the decimal point was lost (0.7 mg)
     .replace(/(\d)[il|](?=\d)/g, '$11')
     .replace(/[^a-z0-9µ.,/%()\s-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/** Row names as printed, for repairing OCR misspellings ("dietary fber", "potassaum", "satarated fat", "totalsugars"). */
+const NAMES = ['serving size', 'calories', 'total fat', 'saturated fat', 'trans fat', 'cholesterol', 'sodium', 'total carbohydrate', 'dietary fiber', 'total sugars', 'protein', 'vitamin d', 'calcium', 'iron', 'potassium', 'vitamin a', 'vitamin c'];
+
+/** Levenshtein distance, stopping early once it exceeds `max`. */
+function editDistance(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      best = Math.min(best, cur[j]);
+    }
+    if (best > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+/**
+ * Put the printed row name back when OCR misspelled it or ran words together: the words before the first number are
+ * compared (spaces ignored) with each known name, allowing about one wrong letter in five. Lines that already read
+ * correctly, and lines that are not near any name, are returned unchanged.
+ * @param {string} line a cleaned line
+ * @returns {string}
+ */
+export function repairName(line) {
+  const m = line.match(/^([a-z][a-z .]*?)\s*(?=\d|$|\()/);
+  if (!m) return line;
+  const head = m[1].replace(/[ .]/g, '');
+  if (head.length < 4) return line;
+  let best = null;
+  for (const name of NAMES) {
+    const want = name.replace(/ /g, '');
+    if (head === want) return line;
+    const d = editDistance(head, want, Math.max(1, Math.floor(want.length / 5)));
+    if (d <= Math.max(1, Math.floor(want.length / 5)) && (!best || d < best.d)) best = { name, d };
+  }
+  return best ? `${best.name} ${line.slice(m[0].length)}`.trim() : line;
 }
 
 /** FDA Daily Values (2016 label rules), in label units, to check an amount against the % DV printed next to it. */
@@ -73,6 +117,11 @@ function amount(rest) {
 
 /** Grams per serving above which a bare number ending in 9 is more likely a misread "g" than a real amount. */
 const TYPICAL_G = { fat: 100, satFat: 40, transFat: 10, fiber: 40, sugar: 100, carbs: 150, protein: 80 };
+/**
+ * Most a serving normally holds, for numbers read with no unit beside them: above this a bare number is more likely a
+ * misread "%" ("1%" read as "196") or a merged column than a real amount, so it is left blank for the person to fill.
+ */
+const TYPICAL_BARE = { ...TYPICAL_G, cholesterol: 400, sodium: 3000, calcium: 1500, iron: 40, potassium: 2500, vitD: 50, vitC: 500, vitA: 2000 };
 
 /**
  * OCR often reads the "g" of "8g" as a 9 ("89"). With no unit and a trailing 9: when a % DV is printed beside it, keep
@@ -125,7 +174,7 @@ export function parseNutritionLabel(text) {
   let label = '1 serving';
   let grams = null;
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].replace(/^[^a-z0-9]+/, '');
+    const line = repairName(lines[i].replace(/^[^a-z0-9]+/, ''));
     const sv = line.match(/^serving\s*size\s*(.*)$/);
     if (sv) {
       const next = !/\d/.test(sv[1]) && lines[i + 1] ? `${sv[1]} ${lines[i + 1]}` : sv[1]; // the amount may sit on the next line
@@ -148,7 +197,7 @@ export function parseNutritionLabel(text) {
       if (per[key] == null) {
         const got = amount(line.slice(m[0].length));
         const a = got && fixLostG(key, got);
-        if (a) {
+        if (a && !(a.unit === '' && a.n > TYPICAL_BARE[key])) {
           const v = toStored(key, a.n, a.unit);
           if (v >= 0 && v <= SANE[key]) per[key] = v;
         }

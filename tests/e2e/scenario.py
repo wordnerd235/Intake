@@ -5,7 +5,7 @@ from pathlib import Path
 
 from playwright.sync_api import expect
 
-from helpers import SHOTS, TINY_PNG, Net, clean_text, num, overflow, small_targets
+from helpers import FAKE_OCR, SHOTS, TINY_PNG, Net, clean_text, num, overflow, small_targets
 
 BANANA_KCAL = 105
 
@@ -232,6 +232,7 @@ class Scenario:
     def scan_label(self):
         p = self.page
         photo = {"name": "label.png", "mimeType": "image/png", "buffer": TINY_PNG}
+        p.evaluate(FAKE_OCR)
         self.open_add()
         # a photo the reader can't make sense of: say so, offer another try
         p.evaluate("window.__ocrText = 'a blurry photo'")
@@ -264,6 +265,16 @@ class Scenario:
         expect(p.locator("#fe-kcal")).to_have_value("190")
         expect(p.locator("#fe-protein")).to_have_value("10")
         expect(p.locator("#fe-label")).to_have_value("1 bar")
+        self.close_sheets()
+        # one tap: text already copied with Live Text is read straight from the clipboard
+        p.context.grant_permissions(["clipboard-read", "clipboard-write"])
+        p.evaluate("navigator.clipboard.writeText('Calories 140\\nTotal Fat 2g 3%\\nProtein 12g')")
+        self.open_add()
+        with p.expect_file_chooser():
+            p.get_by_role("button", name="Scan a nutrition label").click()
+        p.get_by_role("button", name="Paste copied label text").click()
+        expect(p.locator("#fe-kcal")).to_have_value("140")
+        expect(p.locator("#fe-protein")).to_have_value("12")
         self.close_sheets()
 
     def recipe(self):

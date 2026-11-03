@@ -37,7 +37,9 @@ js/
   normalize.js           PURE: Open Food Facts / USDA FDC JSON -> internal Food shape (unit conversions!)
   online-foods.js        fetch wrappers for OFF + FDC (search, barcode), timeouts, errors
   barcode.js             camera scanner sheet: BarcodeDetector, else lazy ZXing from CDN, always manual entry
-  label-scan.js          Nutrition Facts photo -> on-device OCR (lazy Tesseract.js 5 from unpkg) or pasted text -> prefilled Create food
+  label-scan.js          Nutrition Facts photo -> on-device OCR (ppocr.js) or pasted Live Text / clipboard -> prefilled Create food
+  ppocr.js               PaddleOCR on ONNX Runtime Web 1.30 (lazy from unpkg): PP-OCRv5 mobile detector + PP-OCRv4 English recognizer
+  ppocr-core.js          PURE PP-OCR post-processing: DB boxes from the probability map, straightened crops, CTC decode, line rebuild
   label-parse.js         PURE parser for label text (OCR noise: lost "g" read as 9 checked against % DV, O for 0, Added Sugars skipped)
   charts.js              SVG: ring, line (with trend + goal line), bars (with target line), sparkline
   views/

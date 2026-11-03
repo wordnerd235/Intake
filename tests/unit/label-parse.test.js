@@ -98,6 +98,14 @@ test('serving size: grams only, amount on the next line, and nothing readable', 
   assert.equal(empty.label, '1 serving');
 });
 
+test('misspelled and run-together row names are repaired (PaddleOCR output from blurred photos)', () => {
+  const r = parseNutritionLabel('Calorles 110\nSatarated Fat 0.5g 3%\nDietary Fber 2g 7%\nTotalSugars 6g\nPotassaum.400mg 9%\nIron2mg 11%\nVitamin D omcg 0%\nCholesterol Smg 2%\nIron 07mg 4%');
+  assert.deepEqual(r.per, { kcal: 110, satFat: 0.5, fiber: 2, sugar: 6, potassium: 400, iron: 2, vitD: 0, cholesterol: 5 });
+  assert.equal(parseNutritionLabel('Iron 07mg 4%').per.iron, 0.7, 'a lost decimal point: 07 mg is 0.7 mg');
+  assert.equal(parseNutritionLabel('Iron 196').per.iron, undefined, 'a bare 196 is a misread "1%", not 196 mg of iron');
+  assert.equal(parseNutritionLabel('Total Fat 3g\nFatty 9g').per.fat, 3, 'a word that only looks like a name is left alone');
+});
+
 test('cleanLine tidies OCR text', () => {
   assert.equal(cleanLine('  Total  Fat 1o g '), 'total fat 10 g');
   assert.equal(cleanLine('Vitamin D 2μg'), 'vitamin d 2µg');

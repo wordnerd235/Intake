@@ -1,7 +1,7 @@
 // Live label camera: frame checks (steady, in focus, a whole label at a readable size) and when an automatic read counts.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { toGray, motion, sharpness, textLayout, judgeFrame, wholeLabel, FRAME } from '../../js/label-frame.js';
+import { toGray, coarse, motion, sharpness, textLayout, judgeFrame, wholeLabel, FRAME } from '../../js/label-frame.js';
 import { parseNutritionLabel } from '../../js/label-parse.js';
 
 /** A w x h gray "label": dark text strokes `stroke` pixels wide on white, optionally box-blurred `blur` times. */
@@ -28,6 +28,17 @@ test('toGray and motion: a still frame does not move; a shifted one does', () =>
   shifted.set(a.subarray(3));
   assert.ok(motion(a, shifted) > FRAME.maxMotion, String(motion(a, shifted)));
   assert.equal(motion(a, null), Infinity, 'the first frame has nothing to compare with');
+});
+
+test('coarse: block averages, so a one-pixel drift of fine print is not movement but aiming elsewhere is', () => {
+  assert.deepEqual([...coarse(Uint8Array.from([0, 8, 4, 4, 0, 8, 4, 4]), 4, 2, 2)], [4, 4]);
+  const a = printed(96, 128, 2, 2); // a thumbnail of a camera frame is a little soft
+  const drift = new Uint8Array(a.length);
+  drift.set(a.subarray(1)); // one thumbnail pixel (about 1% of the frame)
+  assert.ok(motion(a, drift) > FRAME.maxMotion, 'raw thumbnails: fine print makes any drift look like movement');
+  assert.ok(motion(coarse(a, 96, 128), coarse(drift, 96, 128)) <= FRAME.maxMotion, 'coarse copies: steady enough');
+  const away = new Uint8Array(a.length).fill(240);
+  assert.ok(motion(coarse(a, 96, 128), coarse(away, 96, 128)) > FRAME.maxMotion, 'pointed at a blank wall');
 });
 
 test('sharpness: crisp print passes, blurred print and a blank surface do not', () => {
@@ -57,6 +68,9 @@ test('judgeFrame: one hint at a time, in the order the person can fix them', () 
   assert.match(judgeFrame({ motion: 1, sharp: 0.5, text: { lines: 16, textH: 0.008, span: 0.2 } }).hint, /closer/);
   assert.match(judgeFrame({ motion: 1, sharp: 0.5, text: { lines: 16, textH: 0.08, span: 0.95 } }).hint, /back/);
   assert.deepEqual(judgeFrame({ motion: 1, sharp: 0.5, text: label }), { ready: true, hint: 'Hold still…' });
+  // after a while without a shot, a shakier hand and a softer camera are accepted
+  assert.equal(judgeFrame({ motion: 22, sharp: 0.2, text: label }).ready, false);
+  assert.equal(judgeFrame({ motion: 22, sharp: 0.2, text: label, relaxed: true }).ready, true);
 });
 
 test('wholeLabel: an automatic read needs calories and 4 core rows; half a panel waits for a better shot', () => {

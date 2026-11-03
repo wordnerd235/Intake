@@ -7,8 +7,11 @@
  * Sizes are fractions of the frame's longer side.
  */
 export const FRAME = {
-  /** Mean gray-level change per pixel between two checks (0-255) above which the phone is still moving. */
-  maxMotion: 7,
+  /**
+   * Mean gray-level change per coarse pixel between two checks (0-255) above which the phone is still moving. A
+   * hand-held phone drifts about 1-2% of the frame between checks (8-16 here); 5% (25+) is aiming somewhere else.
+   */
+  maxMotion: 18,
   /** Focus score (see sharpness) below which the picture is too soft to read. */
   minSharp: 0.3,
   /** Fewest text lines a Nutrition Facts panel shows (even a short one: calories, fat, sodium, carbs, sugars, protein). */
@@ -19,6 +22,9 @@ export const FRAME = {
   maxTextH: 0.06,
   /** The text must spread over at least this much of the frame's height (the label fills the frame). */
   minSpan: 0.35,
+  /** After several seconds without a shot, a shakier hand or a softer camera is accepted (the read itself still has to
+   *  find the whole label). */
+  relaxed: { maxMotion: 26, minSharp: 0.15 },
 };
 
 /**
@@ -30,6 +36,29 @@ export function toGray(rgba) {
   const g = new Uint8Array(rgba.length >> 2);
   for (let i = 0, p = 0; p < g.length; i += 4, p++) g[p] = (rgba[i] * 77 + rgba[i + 1] * 150 + rgba[i + 2] * 29) >> 8;
   return g;
+}
+
+/**
+ * Average k x k blocks of a gray image (a coarse copy for the motion check: fine print aliases at thumbnail size, so
+ * even a one-pixel drift of the hand would look like movement).
+ * @param {Uint8Array} gray
+ * @param {number} w
+ * @param {number} h
+ * @param {number} [k]
+ * @returns {Uint8Array} (w/k) x (h/k), rounded down
+ */
+export function coarse(gray, w, h, k = 4) {
+  const cw = Math.floor(w / k);
+  const ch = Math.floor(h / k);
+  const out = new Uint8Array(cw * ch);
+  for (let y = 0; y < ch; y++) {
+    for (let x = 0; x < cw; x++) {
+      let s = 0;
+      for (let dy = 0; dy < k; dy++) for (let dx = 0; dx < k; dx++) s += gray[(y * k + dy) * w + x * k + dx];
+      out[y * cw + x] = s / (k * k);
+    }
+  }
+  return out;
 }
 
 /**
@@ -98,13 +127,14 @@ export function textLayout(boxes, fw, fh) {
 
 /**
  * Is this frame worth reading, and if not, what should the person do?
- * @param {{motion:number, sharp:number, text?:{lines:number, textH:number, span:number}|null}} f text is left out
- *   until the cheaper checks pass
+ * @param {{motion:number, sharp:number, text?:{lines:number, textH:number, span:number}|null, relaxed?:boolean}} f text
+ *   is left out until the cheaper checks pass; relaxed after several seconds without a shot
  * @returns {{ready:boolean, hint:string}}
  */
-export function judgeFrame({ motion: mo, sharp, text }) {
-  if (!(mo <= FRAME.maxMotion)) return { ready: false, hint: 'Hold steady…' };
-  if (!(sharp >= FRAME.minSharp)) return { ready: false, hint: 'Focusing… hold the label flat, in good light.' };
+export function judgeFrame({ motion: mo, sharp, text, relaxed = false }) {
+  const lim = relaxed ? FRAME.relaxed : FRAME;
+  if (!(mo <= lim.maxMotion)) return { ready: false, hint: 'Hold steady…' };
+  if (!(sharp >= lim.minSharp)) return { ready: false, hint: 'Focusing… hold the label flat, in good light.' };
   if (!text) return { ready: false, hint: 'Looking for the label…' };
   if (text.lines < FRAME.minLines) return { ready: false, hint: 'Point the camera at the Nutrition Facts panel, close enough to fill the frame.' };
   if (text.textH > FRAME.maxTextH) return { ready: false, hint: 'Move back so the whole label fits.' };

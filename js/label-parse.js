@@ -191,7 +191,8 @@ function serving(text) {
     .replace(/\(.*$|\s\d+(?:\.\d+)?\s*(?:g|ml)\b.*$/, '') // the weight, and anything OCR read beside the label after it
     .replace(/([a-z])\s*\/.*$/, '$1') // "1 cup/1 taza": the translation
     .replace(/\babout\b/, '')
-    .trim();
+    .trim()
+    .replace(/^(\d+(?:[./]\d+)?)(?=[a-z])/, '$1 '); // "1can" -> "1 can"
   const grams = withG ? Number(withG[1]) : bare ? Number(/^\d{2,}9$/.test(bare[1]) ? bare[1].slice(0, -1) : bare[1]) : null;
   const plainGrams = /^\d+(?:\.\d+)?\s*g$/.test(label);
   return { label: plainGrams || !label ? '1 serving' : label.slice(0, 60), grams: grams && grams > 0 && grams <= 5000 ? grams : null };

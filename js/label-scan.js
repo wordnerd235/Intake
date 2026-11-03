@@ -5,7 +5,7 @@
 // one-time reader download.
 import { h, sheet, button, spinner } from './ui.js';
 import { parseNutritionLabel } from './label-parse.js';
-import { toGray, motion, sharpness, textLayout, judgeFrame, wholeLabel } from './label-frame.js';
+import { toGray, coarse, motion, sharpness, textLayout, judgeFrame, wholeLabel } from './label-frame.js';
 
 /**
  * Recognize the text in a label photo, as lines.
@@ -125,6 +125,9 @@ export function scanLabel({ onRead, onManual }) {
   let ready = !!window.__intakeTestOcr; // the reader is downloaded and started
   let pauseUntil = 0;
   let autoFails = 0;
+  let since = 0; // when the reader was ready and checks began (reset after each try)
+  /** Without a shot for this long, the steadiness and focus checks loosen (FRAME.relaxed). */
+  const RELAX_MS = 6000;
   /** Automatic tries before it stops and leaves the shot to the person (a low-resolution camera never gets every line). */
   const MAX_AUTO = 3;
   /** Copy the current video frame at full resolution. */
@@ -150,6 +153,7 @@ export function scanLabel({ onRead, onManual }) {
     }
     prev = null;
     good = 0;
+    since = 0;
     pauseUntil = Date.now() + 1500; // let the person adjust before the next try
     timer = setInterval(tick, TICK_MS);
   };
@@ -160,16 +164,18 @@ export function scanLabel({ onRead, onManual }) {
     thumb.width = 96;
     thumb.height = Math.round((96 * vh) / vw);
     ctx2d(thumb).drawImage(video, 0, 0, thumb.width, thumb.height);
-    const gray = toGray(ctx2d(thumb).getImageData(0, 0, thumb.width, thumb.height).data);
+    const gray = coarse(toGray(ctx2d(thumb).getImageData(0, 0, thumb.width, thumb.height).data), thumb.width, thumb.height);
     const mo = motion(gray, prev);
     prev = gray;
     const p = Math.max(Math.min(vw, vh) * 0.3, Math.min(PATCH, vw, vh)); // never enlarged: that would soften it
     ctx2d(patch).drawImage(video, (vw - p) / 2, (vh - p) / 2, p, p, 0, 0, PATCH, PATCH);
     const sharp = sharpness(toGray(ctx2d(patch).getImageData(0, 0, PATCH, PATCH).data), PATCH, PATCH);
-    let j = judgeFrame({ motion: mo, sharp, text: null });
+    if (!since) since = Date.now();
+    const relaxed = Date.now() - since > RELAX_MS;
+    let j = judgeFrame({ motion: mo, sharp, text: null, relaxed });
     if (j.hint === 'Looking for the label…') {
       reading = true;
-      try { j = judgeFrame({ motion: mo, sharp, text: await frameText(grab()) }); } catch { j = { ready: false, hint: 'Looking for the label…' }; } finally { reading = false; }
+      try { j = judgeFrame({ motion: mo, sharp, text: await frameText(grab()), relaxed }); } catch { j = { ready: false, hint: 'Looking for the label…' }; } finally { reading = false; }
     }
     if (closed) return;
     good = j.ready ? good + 1 : 0;

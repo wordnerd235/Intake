@@ -145,7 +145,8 @@ export function explainError(status, body) {
   const e = (body && body.error) || {};
   const msg = String(e.message || '');
   const reason = JSON.stringify(e.details || '') + msg;
-  if (!status) return { message: typeof navigator !== 'undefined' && navigator.onLine === false ? 'You are offline. Estimating a meal needs a connection.' : "Couldn't reach Google. Check the connection and try again.", tryNext: false };
+  if (!status) return { message: typeof navigator !== 'undefined' && navigator.onLine === false ? 'You are offline. Estimating a meal needs a connection.' : "Couldn't reach Google's Gemini server (generativelanguage.googleapis.com). If a content blocker, VPN or Wi-Fi filter is on, allow that site or try on cellular.", tryNext: false };
+  if (/ACCESS_TOKEN_TYPE_UNSUPPORTED/.test(reason)) return { message: "Google says this kind of key doesn't work with the Gemini API. Make a key at aistudio.google.com/apikey and paste it in More > Units and display.", tryNext: false };
   if (/API_KEY_INVALID|API key not valid/i.test(reason)) return { message: "Google says this API key isn't valid. Check it in More > Units and display.", tryNext: false };
   if (/SERVICE_DISABLED|has not been used in project|is disabled/i.test(reason)) return { message: 'This key\'s Google project doesn\'t have the Gemini API turned on. Turn on "Generative Language API" for it in Google Cloud, or make a key at aistudio.google.com (those work right away).', tryNext: false };
   if (/referer|API_KEY_HTTP_REFERRER_BLOCKED|API_KEY_SERVICE_BLOCKED/i.test(reason)) return { message: "This key's restrictions block Intake. Allow the Generative Language API (and this website) for the key in Google Cloud, or use an AI Studio key.", tryNext: false };

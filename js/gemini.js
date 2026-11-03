@@ -35,8 +35,11 @@ export async function estimateMeal(photo, key, { signal, fetchFn = globalThis.fe
   if (window.__intakeTestGemini) return parseEstimate(await window.__intakeTestGemini(photo)); // e2e stand-in
   const b64 = await toJpeg(photo);
   let last = null;
+  // "simple" sends the key in the URL as text/plain: a request the browser makes without a CORS preflight. It is the
+  // fallback when the normal request can't get through (some phones, content blockers and networks stop the preflight).
+  let simple = false;
   for (const model of MODELS) {
-    for (const withSchema of [true, false]) {
+    for (let withSchema = true; ;) {
       const ctl = new AbortController();
       const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
       const onAbort = () => ctl.abort();
@@ -44,22 +47,23 @@ export async function estimateMeal(photo, key, { signal, fetchFn = globalThis.fe
       let res = null;
       let body = null;
       try {
-        res = await fetchFn(`${API}${model}:generateContent`, {
-          method: 'POST', credentials: 'omit', signal: ctl.signal,
-          headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-          body: JSON.stringify(buildRequest(b64, 'image/jpeg', withSchema)),
-        });
+        const payload = JSON.stringify(buildRequest(b64, 'image/jpeg', withSchema));
+        res = simple
+          ? await fetchFn(`${API}${model}:generateContent?key=${encodeURIComponent(key)}`, { method: 'POST', credentials: 'omit', signal: ctl.signal, headers: { 'content-type': 'text/plain' }, body: payload })
+          : await fetchFn(`${API}${model}:generateContent`, { method: 'POST', credentials: 'omit', signal: ctl.signal, headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: payload });
         body = await res.json().catch(() => null);
       } catch (e) {
         if (signal && signal.aborted) throw new GeminiError('Cancelled');
-        throw new GeminiError(ctl.signal.aborted ? 'Gemini took too long to answer. Try again.' : explainError(0, null).message);
+        if (ctl.signal.aborted) throw new GeminiError('Gemini took too long to answer. Try again.');
+        if (!simple) { simple = true; continue; }
+        throw new GeminiError(explainError(0, null).message);
       } finally {
         clearTimeout(timer);
         if (signal) signal.removeEventListener('abort', onAbort);
       }
       if (res.ok) return parseEstimate(body);
       // a model that rejects the answer schema gets one try without it; anything else moves on or stops
-      if (res.status === 400 && withSchema && /schema|response_?mime|generation_?config/i.test(JSON.stringify(body || ''))) continue;
+      if (res.status === 400 && withSchema && /schema|response_?mime|generation_?config/i.test(JSON.stringify(body || ''))) { withSchema = false; continue; }
       last = explainError(res.status, body);
       if (!last.tryNext) throw new GeminiError(last.message);
       break;

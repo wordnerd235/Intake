@@ -45,6 +45,7 @@ export function cleanLine(line) {
     .replace(/(^|\s)s(?=\s*(?:m?c?g|µg)\b)/g, '$15') // "smg" -> "5mg"
     .replace(/(^|\s)0(\d)(?=\s*(?:m?c?g|µg)\b)/g, '$10.$2') // "07mg": the decimal point was lost (0.7 mg)
     .replace(/(\d)[il|](?=\d)/g, '$11')
+    .replace(/(^|[^a-z])ron(?=\s*\d)/g, '$1iron') // the "i" of "Iron" is often lost against a rule line
     .replace(/[^a-z0-9µ.,/%()\s-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -85,11 +86,37 @@ export function repairName(line) {
   let best = null;
   for (const name of NAMES) {
     const want = name.replace(/ /g, '');
-    if (head === want) return line;
+    if (head === want) return `${name} ${line.slice(m[0].length)}`.trim(); // "ca lories" -> "calories"
     const d = editDistance(head, want, Math.max(1, Math.floor(want.length / 5)));
     if (d <= Math.max(1, Math.floor(want.length / 5)) && (!best || d < best.d)) best = { name, d };
   }
   return best ? `${best.name} ${line.slice(m[0].length)}`.trim() : line;
+}
+
+/** Where a nutrient row starts, for labels that print several on one line ("Calcium 390mg 30% · Potassium 470mg 10%"). */
+const ROW_START = /total\s*fat|sat(?:urated)?\.?\s*fat|trans\s*fat|cholest|sodium|total\s*carb|dietary\s*fib|total\s*sugars|incl(?:udes|\.)|protein|vit(?:amin|\.)?\s*[adc](?![a-z])|vitamin\s*b|calcium|iron|potas|thiamin|riboflavin|niacin|folate|zinc|magnesium|phosphorus/g;
+
+/**
+ * Split a cleaned line into one line per nutrient row. A row name starts a new row only once a number has been read on
+ * the line, so "not a significant source of saturated fat, trans fat" stays whole. A short stray word before the first
+ * row name (text from beside the label) is dropped. Bilingual names lose their translation ("total fat/grasa total 2g").
+ * @param {string} line a cleaned line
+ * @returns {string[]}
+ */
+export function splitRows(line) {
+  const cuts = [];
+  for (const m of line.matchAll(ROW_START)) if (m.index > 0 && /\d/.test(line.slice(0, m.index))) cuts.push(m.index);
+  const parts = [];
+  let from = 0;
+  for (const c of cuts) { parts.push(line.slice(from, c)); from = c; }
+  parts.push(line.slice(from));
+  return parts.map((p, i) => {
+    let t = p.trim();
+    ROW_START.lastIndex = 0;
+    const first = i === 0 && t.search(ROW_START);
+    if (first > 0 && /^[a-z]{1,6}\s+$/.test(t.slice(0, first))) t = t.slice(first);
+    return t.replace(/^([a-z][a-z .]*?)\s*\/\s*[a-z][a-z .]*?(?=\s*[\d<(]|$)/, '$1 ').trim();
+  }).filter(Boolean);
 }
 
 /** FDA Daily Values (2016 label rules), in label units, to check an amount against the % DV printed next to it. */
@@ -156,7 +183,11 @@ function serving(text) {
   // "(55g)", and OCR's "(559)" or "(55" for it: the weight in brackets is always grams or mL
   const withG = t.match(/(\d+(?:\.\d+)?)\s*g\b/);
   const bare = !withG && t.match(/\((\d+(?:\.\d+)?)\s*(?:\)|$)/);
-  const label = t.replace(/\(.*$/, '').replace(/\babout\b/, '').trim();
+  const label = t
+    .replace(/\(.*$|\s\d+(?:\.\d+)?\s*(?:g|ml)\b.*$/, '') // the weight, and anything OCR read beside the label after it
+    .replace(/([a-z])\s*\/.*$/, '$1') // "1 cup/1 taza": the translation
+    .replace(/\babout\b/, '')
+    .trim();
   const grams = withG ? Number(withG[1]) : bare ? Number(/^\d{2,}9$/.test(bare[1]) ? bare[1].slice(0, -1) : bare[1]) : null;
   const plainGrams = /^\d+(?:\.\d+)?\s*g$/.test(label);
   return { label: plainGrams || !label ? '1 serving' : label.slice(0, 60), grams: grams && grams > 0 && grams <= 5000 ? grams : null };
@@ -169,7 +200,7 @@ function serving(text) {
  *   units (only the nutrients that were read), the serving, and which keys were found (calories first when present)
  */
 export function parseNutritionLabel(text) {
-  const lines = String(text || '').split(/\r?\n/).map(cleanLine).filter(Boolean);
+  const lines = String(text || '').split(/\r?\n/).map(cleanLine).flatMap(splitRows);
   const per = {};
   let label = '1 serving';
   let grams = null;
@@ -186,7 +217,8 @@ export function parseNutritionLabel(text) {
     if (cal && per.kcal == null) {
       const here = cal[1].match(/^(\d{1,4})\b/);
       const after = !here && lines[i + 1] && lines[i + 1].match(/^(\d{1,4})\b/); // big-print labels put the number on its own line
-      const n = here ? Number(here[1]) : after ? Number(after[1]) : null;
+      const before = !here && !after && i > 0 && lines[i - 1].match(/^amount\s*per\s*serving\s+(\d{1,4})$/); // "Amount per serving 140" beside the big number
+      const n = here ? Number(here[1]) : after ? Number(after[1]) : before ? Number(before[1]) : null;
       if (n != null && n <= SANE.kcal) per.kcal = n;
       continue;
     }

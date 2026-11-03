@@ -106,6 +106,23 @@ test('misspelled and run-together row names are repaired (PaddleOCR output from 
   assert.equal(parseNutritionLabel('Total Fat 3g\nFatty 9g').per.fat, 3, 'a word that only looks like a name is left alone');
 });
 
+test('real phone photos (PaddleOCR output): two nutrients per line, glued words, side text, calories beside the heading', () => {
+  const carton = parseNutritionLabel('Serving Size 1 carton 325mL) Corporation\nCalories 160\nTotal Fat 2.5g 3%\nProtein 30g 60%\nVit.D0mcg 0% . Calcium 390mg 30% COATED PAPER CARTON\nron1.4mg8%Potassum470mg10% PROTEINS ISA REGISTERED TRADEMARK.');
+  assert.deepEqual(carton.per, { kcal: 160, fat: 2.5, protein: 30, vitD: 0, calcium: 390, iron: 1.4, potassium: 470 });
+  assert.equal(carton.label, '1 carton', 'text read beside the label is not part of the serving');
+  const crackers = parseNutritionLabel('Amount per serving 140\nCalories\n% Daily Value*\nCholesterol <5mg 11%\nDietary Fiber<1g\nVitamin D Omcg 0%Calcium 40mg\nIron1.2mg\nThiamin 0.14mg 10%Riboflavin 0.14mg 10% 6%Potassium 50mg 0%');
+  assert.deepEqual(crackers.per, { kcal: 140, cholesterol: 5, fiber: 1, vitD: 0, calcium: 40, iron: 1.2, potassium: 50 });
+  const sweetener = parseNutritionLabel('Amo per serving In the remote mountain hig\nCa lories 0\nTotal Fat Og 0% and pure living.\nNot a significant source of saturated fat, and well-binargt\ntrans fathr "The Immortals\'Fruit."\nsugarsvitamin Dcalciumiron and');
+  assert.deepEqual(sweetener.per, { kcal: 0, fat: 0 }, '"not a significant source of saturated fat" is not a row');
+});
+
+test('a bilingual label (English/Spanish), with a stray word from the jar beside it', () => {
+  const r = parseNutritionLabel('Serving size/Tamano por racion 1 cup/1 taza (37g)\nCalories/Calorias 140 210\nTTER Total Fat/Grasa Total 2g* Saturated Fat/Grasa Saturada 0g 0% 3%\nCholesterol/Colesterol Omg 0% 1%\nTotal Carbohydrate/Carbohidrato Total 30g 11% 14%\nIncl.Added Sugars/ncluye azucares anadidos 12g24% 24%\nIron/Hierro 3.6mg 20% 20%');
+  assert.deepEqual(r.per, { kcal: 140, fat: 2, satFat: 0, cholesterol: 0, carbs: 30, iron: 3.6 });
+  assert.equal(r.label, '1 cup');
+  assert.equal(r.grams, 37);
+});
+
 test('cleanLine tidies OCR text', () => {
   assert.equal(cleanLine('  Total  Fat 1o g '), 'total fat 10 g');
   assert.equal(cleanLine('Vitamin D 2μg'), 'vitamin d 2µg');

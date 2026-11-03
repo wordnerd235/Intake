@@ -55,11 +55,16 @@ function hull(xs, ys) {
   return lower.slice(0, -1).concat(upper.slice(0, -1));
 }
 
+/** The same rectangle read along its other side. */
+function swapAxes(r) {
+  return { ...r, w: r.h, h: r.w, ux: -r.uy, uy: r.ux };
+}
+
 /**
  * Smallest rotated rectangle around a region (rotating calipers over its hull). Pixel centers are widened by half a
  * pixel each way so a one-pixel line still has height.
- * @returns {{cx:number, cy:number, w:number, h:number, ux:number, uy:number}} center, size along the long axis (w) and
- *   across it (h), and the unit vector of the long axis (pointing right)
+ * @returns {{cx:number, cy:number, w:number, h:number, ux:number, uy:number}} center, size along the reading direction (w)
+ *   and across it (h), and the unit vector of the reading direction (pointing right): the side nearer horizontal
  */
 export function minAreaRect(xs, ys) {
   const H = hull(xs, ys);
@@ -89,7 +94,7 @@ export function minAreaRect(xs, ys) {
   const cu = (u0 + u1) / 2;
   const cv = (v0 + v1) / 2;
   let r = { cx: cu * ux - cv * uy, cy: cu * uy + cv * ux, w: u1 - u0 + 1, h: v1 - v0 + 1, ux, uy };
-  if (r.h > r.w) r = { ...r, w: r.h, h: r.w, ux: -uy, uy: ux }; // long axis first
+  if (Math.abs(r.uy) > Math.abs(r.ux)) r = swapAxes(r); // the reading direction is the side nearer horizontal: a big "0" stays upright
   if (r.ux < 0) r = { ...r, ux: -r.ux, uy: -r.uy }; // pointing right
   return r;
 }
@@ -110,9 +115,12 @@ export function boxesFromMap(prob, w, h, sx, sy, { thresh = 0.3, boxThresh = 0.6
   const boxes = [];
   for (const r of regions(prob, w, h, thresh)) {
     if (r.score < boxThresh) continue;
-    const m = minAreaRect(r.xs, r.ys);
+    let m = minAreaRect(r.xs, r.ys);
     if (Math.min(m.w, m.h) < minSize) continue;
     const d = (m.w * m.h * unclip) / (2 * (m.w + m.h));
+    // A grown box over 1.5 times taller than wide is a vertical line of text: read it along its length. (Judged after
+    // growing, as PaddleOCR does: the shrunk core of a lone big "0" is much taller than the digit.)
+    if (m.h + 2 * d > 1.5 * (m.w + 2 * d)) { m = swapAxes(m); if (m.ux < 0) m = { ...m, ux: -m.ux, uy: -m.uy }; }
     const hw = m.w / 2 + d;
     const hh = m.h / 2 + d;
     const vx = -m.uy;

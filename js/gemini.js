@@ -56,12 +56,16 @@ export async function estimateMeal(photo, key, { signal, fetchFn = globalThis.fe
         if (signal && signal.aborted) throw new GeminiError('Cancelled');
         if (ctl.signal.aborted) throw new GeminiError('Gemini took too long to answer. Try again.');
         if (!simple) { simple = true; continue; }
-        // Both forms failed before any answer. A keyless GET tells a blocked network apart from Google refusing this
-        // request in a way the browser hides (Google answers a keyless call with a readable 403).
-        let reachable = false;
-        try { reachable = !!(await fetchFn(API.replace(/\/$/, ''), { credentials: 'omit' })).status; } catch { /* blocked */ }
-        throw new GeminiError(reachable
-          ? 'Google is reachable, but your phone stopped its answer to this request (code: blocked-answer). Try once on cellular; if it still fails, tell whoever helps you with Intake this code.'
+        // Both forms failed before any answer. Safari does this when Google refuses the key before the photo has
+        // finished uploading, so ask about the model alone, without the photo: a small request whose answer arrives.
+        let check = null;
+        try {
+          const r = await fetchFn(`${API}${model}`, { credentials: 'omit', headers: { 'x-goog-api-key': key } });
+          check = { ok: r.ok, status: r.status, body: await r.json().catch(() => null) };
+        } catch { /* Google unreachable from here */ }
+        if (check && !check.ok) throw new GeminiError(explainError(check.status, check.body).message);
+        throw new GeminiError(check
+          ? 'Google accepts the key, but your phone stopped its answer about the photo (code: blocked-answer). Try once on cellular, or with a smaller photo.'
           : explainError(0, null).message);
       } finally {
         clearTimeout(timer);

@@ -28,6 +28,18 @@ test('minAreaRect: long axis first, pointing right, also for a tilted bar', () =
   assert.ok(b.ux > 0.95 && b.uy > 0.1, `${b.ux},${b.uy}`);
 });
 
+test('a lone tall digit stays upright; a clearly vertical line is read along its length', () => {
+  const block = (w, h) => { const xs = []; const ys = []; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { xs.push(x); ys.push(y); } return [Int32Array.from(xs), Int32Array.from(ys)]; };
+  const zero = minAreaRect(...block(10, 14));
+  assert.deepEqual([zero.w, zero.h, zero.ux, zero.uy], [10, 14, 1, 0], 'minAreaRect reads along the side nearer horizontal');
+  // The detector's core of the big "0" of "Calories 0" is 2:1 tall, but the grown box is not: it must not be read sideways.
+  const [tl, tr, , bl] = boxesFromMap(map(40, 40, [[15, 10, 25, 30, 0.9]]), 40, 40, 1, 1)[0];
+  assert.ok(tr[0] > tl[0] + 10 && Math.abs(tr[1] - tl[1]) < 1e-6 && bl[1] > tl[1] + 20, JSON.stringify([tl, tr, bl]));
+  // "VITAL PROTEINS IS A REGISTERED TRADEMARK" up the side of a carton.
+  const [vtl, vtr] = boxesFromMap(map(40, 80, [[18, 5, 22, 75, 0.9]]), 40, 80, 1, 1)[0];
+  assert.ok(Math.abs(vtr[1] - vtl[1]) > 60, 'read along its length');
+});
+
 test('boxesFromMap: drops faint and tiny regions, grows text cores, scales to the photo', () => {
   const m = map(64, 32, [[4, 4, 44, 10, 0.95], [50, 20, 60, 24, 0.4], [50, 4, 52, 6, 0.99]]);
   const boxes = boxesFromMap(m, 64, 32, 2, 2);

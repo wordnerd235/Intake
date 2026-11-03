@@ -297,6 +297,54 @@ class Scenario:
         expect(p.locator("#fe-protein")).to_have_value("12")
         self.close_sheets()
 
+    def meal_photo(self):
+        p = self.page
+        answer = '{"items":[{"name":"Ripe banana","search":"banana raw","grams":118,"kcal":105,"protein":1.3,"carbs":27,"fat":0.4},{"name":"Church potluck casserole","search":"zzpotluck casserole","grams":100,"kcal":210,"protein":1,"carbs":32,"fat":9}],"note":"Assumed the casserole has cheese and butter."}'
+        p.evaluate("(a) => { window.__intakeTestGemini = async () => { if (window.__geminiFail) throw new Error(window.__geminiFail); return { candidates: [{ content: { parts: [{ text: a }] } }] }; }; }", answer)
+        before = self.day_total()
+        photo = {"name": "plate.png", "mimeType": "image/png", "buffer": TINY_PNG}
+        self.open_add()
+        p.get_by_role("button", name="Estimate a meal from a photo").click()
+        # first time: it asks for the person's own Google key, and checks it looks like one
+        p.fill("#mp-key", "not a key")
+        p.get_by_role("button", name="Save key").click()
+        expect(p.locator(".sheet .field-error").last).to_contain_text("Google API key")
+        p.fill("#mp-key", "AIza" + "x" * 35)
+        p.get_by_role("button", name="Save key").click()
+        clean_text(p, "meal photo start")
+        # Google says no: the reason is shown, and another photo can be tried
+        p.evaluate("window.__geminiFail = 'Gemini\\'s free limit is used up for now.'")
+        with p.expect_file_chooser() as fc:
+            p.get_by_role("button", name="Take or choose a photo").click()
+        fc.value.set_files(photo)
+        expect(p.locator(".sheet .notice").last).to_contain_text("free limit")
+        p.evaluate("delete window.__geminiFail")
+        with p.expect_file_chooser() as fc:
+            p.get_by_role("button", name="Take or choose a photo").click()
+        fc.value.set_files(photo)
+        # the list: banana matched to the USDA food; the casserole has no USDA match and keeps Gemini's estimate
+        expect(p.locator(".mp-item")).to_have_count(2)
+        expect(p.locator(".mp-item").first).to_contain_text("USDA: Bananas, raw")
+        expect(p.locator(".mp-item").nth(1)).to_contain_text("Gemini estimate")
+        expect(p.locator(".sheet .notice").last).to_contain_text("cheese and butter")
+        clean_text(p, "meal photo review")
+        self.shot("meal-photo")
+        p.fill("#mp-g0", "236")  # two bananas, not one: the macros follow the amount
+        expect(p.locator(".mp-item").first.locator(".mp-macros")).to_contain_text("210 kcal")
+        p.get_by_role("button", name=re.compile(r"^Add all 2 to ")).click()
+        expect(p.locator(".toast-msg")).to_contain_text("Added 2 items")
+        self.close_sheets()
+        assert abs(self.day_total() - (before + 420)) <= 1, self.day_total()
+        expect(p.locator(".entry", has_text="Church potluck casserole (photo estimate)")).to_have_count(1)
+        for name in ("Ripe banana", "Church potluck casserole (photo estimate)"):  # each is an ordinary entry; tidy up for the steps after
+            p.locator(".entry", has_text=name).first.click()
+            p.get_by_role("button", name="Delete").click()
+            expect(p.locator(".entry", has_text=name)).to_have_count(0)
+        assert self.day_total() == before
+        # the key can be changed or removed in More
+        self.goto("#/more")
+        expect(p.locator("#pf-gemini")).to_have_value("AIza" + "x" * 35)
+
     def recipe(self):
         p = self.page
         before = self.day_total()
@@ -1004,7 +1052,7 @@ class Scenario:
         for label, fn in (
             ("onboarding", self.onboarding), ("today starts empty", self.today_empty),
             ("search banana, add 1 medium = 105 kcal", self.search_banana_and_add), ("edit quantity (fractions, validation)", self.edit_quantity),
-            ("delete entry and Undo", self.delete_and_undo), ("quick add", self.quick_add), ("create custom food and log it", self.custom_food), ("scan a nutrition label into a new food", self.scan_label),
+            ("delete entry and Undo", self.delete_and_undo), ("quick add", self.quick_add), ("create custom food and log it", self.custom_food), ("scan a nutrition label into a new food", self.scan_label), ("estimate a meal from a photo", self.meal_photo),
             ("create recipe and log a serving", self.recipe), ("exercise raises remaining", self.exercise), ("water and weight", self.water_and_weight),
             ("date navigation", self.date_navigation), ("copy meal from yesterday (+Undo)", self.copy_meal_from_yesterday),
             ("copy whole day (+Undo)", self.copy_whole_day), ("copy one entry to another day (+Undo)", self.copy_one_entry), ("amount limits", self.amount_limits), ("number fields have ceilings and say which", self.number_caps),

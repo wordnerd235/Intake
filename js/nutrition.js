@@ -53,6 +53,7 @@ export const DEFAULT_PROFILE = {
   addExerciseCalories: true,
   theme: 'system',
   fdcApiKey: '',
+  geminiApiKey: '',
   onboarded: false,
   startWeightKg: null,
   startDate: null,

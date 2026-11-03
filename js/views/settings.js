@@ -134,6 +134,8 @@ export async function mount(root) {
     const unitChange = async (patch) => { await store.saveSettings({ units: patch }); if (alive) render(); };
     const fdc = h('input', { class: 'input', id: 'pf-fdc', value: st.fdcApiKey || '', autocomplete: 'off', spellcheck: 'false', placeholder: 'Optional' });
     fdc.addEventListener('change', () => { save({ fdcApiKey: fdc.value.trim() }); toast(fdc.value.trim() ? 'USDA key saved' : 'USDA key removed'); });
+    const gem = h('input', { class: 'input', id: 'pf-gemini', type: 'password', value: st.geminiApiKey || '', autocomplete: 'off', spellcheck: 'false', placeholder: 'Optional' });
+    gem.addEventListener('change', () => { save({ geminiApiKey: gem.value.trim() }); toast(gem.value.trim() ? 'Gemini key saved' : 'Gemini key removed'); });
     const display = card('Units and display', [
       h('div', { class: 'two-up' }, field('Weight', segmented([{ value: 'lb', label: 'lb' }, { value: 'kg', label: 'kg' }], u.weight, (v) => unitChange({ weight: v }), 'Weight unit')), field('Water', segmented([{ value: 'oz', label: 'fl oz' }, { value: 'ml', label: 'ml' }], u.water, (v) => unitChange({ water: v }), 'Water unit'))),
       field('Height', segmented([{ value: 'ftin', label: 'ft / in' }, { value: 'cm', label: 'cm' }], u.height, (v) => unitChange({ height: v }), 'Height unit')),
@@ -141,6 +143,7 @@ export async function mount(root) {
       field('Daily water goal', goalWater.el),
       h('details', { class: 'more' }, h('summary', null, 'Meal names'), h('div', { class: 'two-up' }, names)),
       field('USDA FoodData Central API key', fdc, h('span', null, 'Optional. Without a key, USDA branded search uses a shared demo key with a very low limit. ', h('a', { href: 'https://fdc.nal.usda.gov/api-key-signup', target: '_blank', rel: 'noopener noreferrer', class: 'link' }, 'Get a free key'), '.')),
+      field('Google Gemini API key', gem, h('span', null, 'Optional. Lets Add food estimate a meal from a photo. The photo is sent to Google (on the free tier Google may use it to improve its products); the key stays on this device. ', h('a', { href: 'https://aistudio.google.com/apikey', target: '_blank', rel: 'noopener noreferrer', class: 'link' }, 'Get a free key'), '.')),
     ]);
 
     const cs = cloud.status();

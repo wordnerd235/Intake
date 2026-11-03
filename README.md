@@ -4,7 +4,7 @@ Intake is a calorie and nutrition tracker that runs in the browser and installs 
 
 - Works fully offline and without an account. Your diary lives in the browser's IndexedDB on the device.
 - Optional free sync between your phone and computer through Firebase. Sign in with email and password (works everywhere); Google sign-in is offered as a second option.
-- About 7,800 USDA foods ship with the app and search instantly offline. Online lookups (Open Food Facts, USDA branded foods) barcode scanning and nutrition label scanning (a live camera that takes the picture itself once the label is steady and sharp, read on the phone by PaddleOCR, about 25 MB downloaded once; or a photo, or text copied with iPhone Live Text) are extras.
+- About 7,800 USDA foods ship with the app and search instantly offline. Online lookups (Open Food Facts, USDA branded foods) barcode scanning and nutrition label scanning (a live camera that takes the picture itself once the label is steady and sharp, read on the phone by PaddleOCR, about 25 MB downloaded once; or a photo, or text copied with iPhone Live Text) are extras. So is estimating a meal from a photo: tap the plate icon in Add food; it uses your own Google Gemini API key (free from aistudio.google.com/apikey, saved on this device under More > Units and display). The photo is sent to Google, which may use free-tier data to improve its products. If your key comes from a Google Cloud project, turn on the "Generative Language API" there.
 - No build step, no npm install, no framework. Plain HTML, CSS and ES modules, so the folder you see is the folder you publish.
 
 Intake is a personal tracking tool. It is not medical advice (see the end of this file).

@@ -209,8 +209,23 @@ export function calorieTarget(profile, kg, now = new Date()) {
   return { target: Math.round(clamped ? floor : raw), source: 'calc', bmr: b, tdee, adjust, raw, floor, clamped };
 }
 
-/** Kinds: 'limit' (over = warning), 'goal' (aim to reach), null (informational). */
-const LIMIT_KEYS = new Set(['satFat', 'sodium', 'cholesterol', 'sugar', 'transFat']);
+/** Kinds: 'limit' (stay under: green under, red over), 'goal' (aim to reach: green once reached), null (informational). */
+const LIMIT_KEYS = new Set(['kcal', 'carbs', 'fat', 'satFat', 'sodium', 'cholesterol', 'sugar', 'transFat']);
+
+/**
+ * How a day's amount stands against its target: 'over' (a limit exceeded), 'under' (within a limit), 'met' (a goal
+ * reached), or '' (a goal not reached yet, or no target). A limit is only called 'under' when every logged food had data
+ * for it (`unknown` false): with missing data the real amount may be higher.
+ * @param {number} v
+ * @param {{value:number|null, kind:'limit'|'goal'|null}} t
+ * @param {boolean} [unknown]
+ * @returns {'over'|'under'|'met'|''}
+ */
+export function targetStatus(v, t, unknown = false) {
+  if (!t || !t.value || !t.kind) return '';
+  if (t.kind === 'limit') return v > t.value ? 'over' : unknown ? '' : 'under';
+  return v >= t.value ? 'met' : '';
+}
 
 /**
  * Per-nutrient targets for the day: { key: {value:number|null, kind:'limit'|'goal'|null} }.
@@ -221,10 +236,10 @@ export function resolveTargets(profile, kcal) {
   const male = profile.sex !== 'female';
   const macros = macroTargets(kcal, profile.macroPct || DEFAULT_PROFILE.macroPct);
   const base = {
-    kcal: [kcal, 'goal'],
+    kcal: [kcal, 'limit'],
     protein: [macros.protein, 'goal'],
-    carbs: [macros.carbs, 'goal'],
-    fat: [macros.fat, 'goal'],
+    carbs: [macros.carbs, 'limit'],
+    fat: [macros.fat, 'limit'],
     fiber: [(14 * kcal) / 1000, 'goal'],
     sugar: [null, null],
     satFat: [(0.1 * kcal) / 9, 'limit'],

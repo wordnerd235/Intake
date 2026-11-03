@@ -611,6 +611,13 @@ class Scenario:
         p.get_by_role("button", name="All nutrients").click()
         expect(p.locator(".sheet .ntable")).to_be_visible()
         expect(p.locator(".sheet-title").last).to_contain_text("Nutrients")
+        # fat and calories are stay-under limits: green while under, red once over; protein is a goal to reach
+        fat = p.locator(".sheet .nrow", has=p.locator(".nname", has_text=re.compile(r"^Fat"))).first
+        expect(fat.locator(".ntgt")).to_contain_text("≤")
+        cls = fat.get_attribute("class")
+        txt = fat.locator(".bar-text").inner_text()
+        assert ("is-over" in cls) == ("over limit" in txt) and ("is-met" in cls) == ("under limit" in txt), (cls, txt)
+        expect(p.locator(".sheet .nrow", has=p.locator(".nname", has_text=re.compile(r"^Protein"))).first.locator(".ntgt")).not_to_contain_text("≤")
         self.close_sheets()
 
     def online_search_and_barcode(self):

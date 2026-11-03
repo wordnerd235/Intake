@@ -78,6 +78,8 @@ test('default nutrient targets', () => {
   assert.equal(t.vitC.value, 90);
   assert.equal(t.vitD.value, 15);
   assert.equal(t.sugar.kind, null);
+  for (const k of ['kcal', 'carbs', 'fat']) assert.equal(t[k].kind, 'limit', `${k} is a stay-under target`);
+  assert.equal(t.protein.kind, 'goal');
   const f = N.resolveTargets({ ...male, sex: 'female' }, 1800);
   assert.equal(f.potassium.value, 2600);
   assert.equal(f.iron.value, 18);
@@ -87,6 +89,22 @@ test('default nutrient targets', () => {
   assert.equal(o.sodium.value, 1500);
   assert.equal(o.sugar.value, 50);
   assert.equal(o.sugar.kind, 'limit');
+});
+
+test('targetStatus: limits are green under and red over; goals are green once reached', () => {
+  const lim = { value: 65, kind: 'limit' };
+  const goal = { value: 140, kind: 'goal' };
+  assert.equal(N.targetStatus(70, lim), 'over', 'over the fat limit');
+  assert.equal(N.targetStatus(40, lim), 'under');
+  assert.equal(N.targetStatus(65, lim), 'under', 'exactly at the limit is still fine');
+  assert.equal(N.targetStatus(0, lim), 'under');
+  assert.equal(N.targetStatus(40, lim, true), '', 'missing data: the real amount may be higher, so no green');
+  assert.equal(N.targetStatus(70, lim, true), 'over', 'already over even with missing data');
+  assert.equal(N.targetStatus(150, goal), 'met');
+  assert.equal(N.targetStatus(140, goal), 'met');
+  assert.equal(N.targetStatus(100, goal), '');
+  assert.equal(N.targetStatus(5, { value: null, kind: null }), '');
+  assert.equal(N.targetStatus(5, undefined), '');
 });
 
 test('exercise kcal = MET x kg x min / 60', () => {

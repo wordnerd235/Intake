@@ -5,7 +5,7 @@ from pathlib import Path
 
 from playwright.sync_api import expect
 
-from helpers import FAKE_OCR, SHOTS, TINY_PNG, Net, clean_text, num, overflow, small_targets
+from helpers import FAKE_CAMERA, FAKE_OCR, NO_CAMERA, SHOTS, TINY_PNG, Net, clean_text, num, overflow, small_targets
 
 BANANA_KCAL = 105
 
@@ -233,19 +233,14 @@ class Scenario:
         p = self.page
         photo = {"name": "label.png", "mimeType": "image/png", "buffer": TINY_PNG}
         p.evaluate(FAKE_OCR)
+        # the live camera: it takes the picture itself once the label is steady and sharp, and reads it
+        p.evaluate(FAKE_CAMERA)
         self.open_add()
-        # a photo the reader can't make sense of: say so, offer another try
-        p.evaluate("window.__ocrText = 'a blurry photo'")
-        with p.expect_file_chooser() as fc:
-            p.get_by_role("button", name="Scan a nutrition label").click()
-        fc.value.set_files(photo)
-        expect(p.locator(".scan-status")).to_contain_text("Couldn't read that label")
-        # a readable label: the numbers land in Create food, to be checked before saving
-        p.evaluate("delete window.__ocrText")
-        with p.expect_file_chooser() as fc:
-            p.get_by_role("button", name="Try again").click()
-        fc.value.set_files(photo)
-        expect(p.locator(".sheet-title").last).to_have_text("Check the scanned label")
+        p.get_by_role("button", name="Scan a nutrition label").click()
+        expect(p.locator(".scan-stage.label video")).to_be_visible()
+        clean_text(p, "label camera")
+        self.shot("label-camera")
+        expect(p.locator(".sheet-title").last).to_have_text("Check the scanned label", timeout=15000)
         expect(p.locator(".fe-note")).to_contain_text("check each number")
         for sel, want in (("#fe-kcal", "230"), ("#fe-fat", "8"), ("#fe-satFat", "1"), ("#fe-sodium", "160"), ("#fe-carbs", "37"), ("#fe-fiber", "4"), ("#fe-sugar", "12"), ("#fe-protein", "3"), ("#fe-label", "2/3 cup"), ("#fe-grams", "55")):
             expect(p.locator(sel)).to_have_value(want)
@@ -255,10 +250,36 @@ class Scenario:
         expect(p.locator("#fd-qty")).to_be_visible()  # straight to logging it
         expect(p.locator(".sheet-title").last).to_have_text("Scanned granola")
         self.close_sheets()
+        # half a label (the shot cut off the bottom) is not taken on its own: it keeps trying and offers what it read
+        p.evaluate("window.__ocrText = 'Calories 120\\nTotal Fat 3g'")
+        self.open_add()
+        p.get_by_role("button", name="Scan a nutrition label").click()
+        expect(p.locator(".scan-status")).to_contain_text("Couldn't read the whole label", timeout=15000)
+        p.get_by_role("button", name="Use what it read (2 values)").click()
+        expect(p.locator("#fe-kcal")).to_have_value("120")
+        expect(p.locator("#fe-fat")).to_have_value("3")
+        self.close_sheets()
+        # no camera: a photo from the camera app works the same way
+        p.evaluate("delete window.__ocrText")
+        p.evaluate(NO_CAMERA)
+        self.open_add()
+        p.get_by_role("button", name="Scan a nutrition label").click()
+        expect(p.locator(".scan-status")).to_contain_text("Couldn't start the camera")
+        expect(p.locator(".scan-stage")).to_be_hidden()
+        p.evaluate("window.__ocrText = 'a blurry photo'")  # a photo the reader can't make sense of: say so, offer another try
+        with p.expect_file_chooser() as fc:
+            p.get_by_role("button", name="Take photo").click()
+        fc.value.set_files(photo)
+        expect(p.locator(".scan-status")).to_contain_text("Couldn't read that label")
+        p.evaluate("delete window.__ocrText")
+        with p.expect_file_chooser() as fc:
+            p.get_by_role("button", name="Try again").click()
+        fc.value.set_files(photo)
+        expect(p.locator("#fe-kcal")).to_have_value("230")
+        self.close_sheets()
         # text copied from the photo (iPhone Live Text) can be pasted instead
         self.open_add()
-        with p.expect_file_chooser():
-            p.get_by_role("button", name="Scan a nutrition label").click()
+        p.get_by_role("button", name="Scan a nutrition label").click()
         p.locator(".ls-paste summary").click()
         p.fill("#ls-text", "Nutrition Facts\nServing size 1 bar (40g)\nCalories 190\nTotal Fat 7g 9%\nProtein 10g")
         p.get_by_role("button", name="Use this text").click()
@@ -270,8 +291,7 @@ class Scenario:
         p.context.grant_permissions(["clipboard-read", "clipboard-write"])
         p.evaluate("navigator.clipboard.writeText('Calories 140\\nTotal Fat 2g 3%\\nProtein 12g')")
         self.open_add()
-        with p.expect_file_chooser():
-            p.get_by_role("button", name="Scan a nutrition label").click()
+        p.get_by_role("button", name="Scan a nutrition label").click()
         p.get_by_role("button", name="Paste copied label text").click()
         expect(p.locator("#fe-kcal")).to_have_value("140")
         expect(p.locator("#fe-protein")).to_have_value("12")

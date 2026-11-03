@@ -103,6 +103,8 @@ test('misspelled and run-together row names are repaired (PaddleOCR output from 
   assert.deepEqual(r.per, { kcal: 110, satFat: 0.5, fiber: 2, sugar: 6, potassium: 400, iron: 2, vitD: 0, cholesterol: 5 });
   assert.equal(parseNutritionLabel('Iron 07mg 4%').per.iron, 0.7, 'a lost decimal point: 07 mg is 0.7 mg');
   assert.equal(parseNutritionLabel('Iron 196').per.iron, undefined, 'a bare 196 is a misread "1%", not 196 mg of iron');
+  assert.equal(parseNutritionLabel('ron1.mg8%Potassum470mg10%').per.iron, undefined, '"1.mg" lost the digit after the point (1.4): blank, not 1');
+  assert.equal(parseNutritionLabel('Calcium3 390mg 30%').per.calcium, 390, 'a stray digit before the amount with its unit');
   assert.equal(parseNutritionLabel('Total Fat 3g\nFatty 9g').per.fat, 3, 'a word that only looks like a name is left alone');
 });
 

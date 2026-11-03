@@ -130,16 +130,20 @@ const DV = { fat: 78, satFat: 20, cholesterol: 300, sodium: 2300, carbs: 275, fi
  */
 function amount(rest) {
   const re = /(\d+(?:,\d{3})*(?:\.\d+)?)\s*(mcg|µg|ug|mg|g)?/g;
+  let bare = null;
   let m;
   while ((m = re.exec(rest))) {
     const before = rest[m.index - 1];
-    if (before && /[a-z]/.test(before)) continue; // part of a word ("b12")
+    if (before && /[a-z]/.test(before) && m.index > 0) continue; // part of a word ("b12")
     const after = rest.slice(m.index + m[0].length);
+    if (!m[2] && /^\.\s*(?:mcg|µg|ug|mg|g)(?![a-z])/.test(after)) return null; // "1.mg": a digit after the point was lost; leave it blank
     if (!m[2] && /^\s*%/.test(after)) continue; // a % DV, not an amount
     const p = after.match(/^\s*(\d{1,3})\s*%/);
-    return { n: Number(m[1].replace(/,/g, '')), unit: m[2] || '', raw: m[1], pct: p ? Number(p[1]) : null };
+    const a = { n: Number(m[1].replace(/,/g, '')), unit: m[2] || '', raw: m[1], pct: p ? Number(p[1]) : null };
+    if (a.unit) return a;
+    bare = bare || a; // "Calcium3 390mg": a stray digit before the real amount; keep looking for one with a unit
   }
-  return null;
+  return bare;
 }
 
 /** Grams per serving above which a bare number ending in 9 is more likely a misread "g" than a real amount. */

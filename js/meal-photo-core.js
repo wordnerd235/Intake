@@ -46,10 +46,14 @@ export const SCHEMA = {
  * @param {string} mime e.g. image/jpeg
  * @param {boolean} [withSchema] false sends JSON mode without the schema (a fallback if a model refuses the schema)
  */
-export function buildRequest(b64, mime, withSchema = true) {
+export function buildRequest(b64, mime, withSchema = true, quick = true) {
   return {
     contents: [{ role: 'user', parts: [{ text: PROMPT }, { inline_data: { mime_type: mime, data: b64 } }] }],
-    generationConfig: { temperature: 0.2, responseMimeType: 'application/json', ...(withSchema ? { responseSchema: SCHEMA } : {}) },
+    generationConfig: {
+      temperature: 0.2, responseMimeType: 'application/json', ...(withSchema ? { responseSchema: SCHEMA } : {}),
+      // Gemini 3 Flash thinks at "medium" by default; "low" (Google's advice for recognition tasks) answers much sooner
+      ...(quick ? { thinkingConfig: { thinkingLevel: 'low' } } : {}),
+    },
   };
 }
 

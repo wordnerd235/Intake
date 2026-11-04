@@ -42,7 +42,7 @@ js/
   ppocr.js               PaddleOCR on ONNX Runtime Web 1.30 (lazy from unpkg): PP-OCRv5 mobile detector + PP-OCRv4 English recognizer
   ppocr-core.js          PURE PP-OCR post-processing: DB boxes from the probability map, straightened crops, CTC decode, line rebuild
   meal-photo-core.js     PURE meal photo estimate: Gemini request/schema, answer parsing, USDA match (kcal within max(25, 20%)), diary entries, error text
-  gemini.js              Gemini generateContent call (the person's own key, x-goog-api-key; gemini-3.8-flash then Flash-Lite), photo shrunk to 1024 px JPEG, thinkingLevel low (dropped if refused)
+  gemini.js              Gemini generateContent call (the person's own key, x-goog-api-key; gemini-3.8-flash then Flash-Lite), 30 s on Flash before Flash-Lite, photo shrunk to 1024 px JPEG, thinkingLevel low (dropped if refused)
   label-parse.js         PURE parser for label text (OCR noise: lost "g" read as 9 checked against % DV, O for 0, Added Sugars skipped)
   charts.js              SVG: ring, line (with trend + goal line), bars (with target line), sparkline
   views/

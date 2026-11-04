@@ -57,13 +57,14 @@ export async function openMealPhoto({ date, meal, onDone }) {
 
   async function estimate(file) {
     const url = URL.createObjectURL(file);
-    body.replaceChildren(h('img', { class: 'mp-photo', src: url, alt: 'Your photo' }), h('p', { class: 'muted', role: 'status' }, spinner('Estimating'), ' Asking Gemini what\'s on the plate…'), pick);
+    const status = h('span', null, ' Asking Gemini what\'s on the plate…');
+    body.replaceChildren(h('img', { class: 'mp-photo', src: url, alt: 'Your photo' }), h('p', { class: 'muted', role: 'status' }, spinner('Estimating'), status), pick);
     s.showFooter(null);
     ctl = new AbortController();
     let r;
     try {
       const { estimateMeal } = await import('../gemini.js');
-      r = await estimateMeal(file, settings.geminiApiKey, { signal: ctl.signal });
+      r = await estimateMeal(file, settings.geminiApiKey, { signal: ctl.signal, onStatus: (t) => { status.textContent = ` ${t}`; } });
     } catch (e) {
       if (e && e.message === 'Cancelled') return;
       return start((e && e.message) || "Couldn't get an estimate.");

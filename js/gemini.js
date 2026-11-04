@@ -6,7 +6,8 @@ import { MODELS, buildRequest, parseEstimate, explainError } from './meal-photo-
 const API = 'https://generativelanguage.googleapis.com/v1beta/models/';
 /** Longest side of the photo sent: plenty to judge portions, and a small upload. */
 const SIDE = 1024;
-const TIMEOUT_MS = 90000;
+/** How long to wait for each model: Flash gets 30 s before the lighter Flash-Lite (its own capacity) is asked instead. */
+const TIMEOUT_MS = [30000, 60000];
 
 /** Shrink a photo to a JPEG no larger than SIDE, as base64. */
 async function toJpeg(blob) {
@@ -28,10 +29,10 @@ export class GeminiError extends Error {}
  * Ask Gemini what is on the plate.
  * @param {Blob} photo
  * @param {string} key the person's Google API key
- * @param {{signal?:AbortSignal, fetchFn?:typeof fetch}} [o]
+ * @param {{signal?:AbortSignal, fetchFn?:typeof fetch, onStatus?:(text:string)=>void}} [o] onStatus hears when it moves on
  * @returns {Promise<ReturnType<typeof parseEstimate>>}
  */
-export async function estimateMeal(photo, key, { signal, fetchFn = globalThis.fetch } = {}) {
+export async function estimateMeal(photo, key, { signal, fetchFn = globalThis.fetch, onStatus } = {}) {
   if (window.__intakeTestGemini) return parseEstimate(await window.__intakeTestGemini(photo)); // e2e stand-in
   const b64 = await toJpeg(photo);
   let last = null;
@@ -39,10 +40,11 @@ export async function estimateMeal(photo, key, { signal, fetchFn = globalThis.fe
   // fallback when the normal request can't get through (some phones, content blockers and networks stop the preflight).
   let simple = false;
   let quick = true; // low thinking; dropped if a model rejects the setting
-  for (const model of MODELS) {
+  for (const [mi, model] of MODELS.entries()) {
+    const isLast = mi === MODELS.length - 1;
     for (let withSchema = true; ;) {
       const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+      const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS[Math.min(mi, TIMEOUT_MS.length - 1)]);
       const onAbort = () => ctl.abort();
       if (signal) signal.addEventListener('abort', onAbort, { once: true });
       let res = null;
@@ -55,7 +57,12 @@ export async function estimateMeal(photo, key, { signal, fetchFn = globalThis.fe
         body = await res.json().catch(() => null);
       } catch (e) {
         if (signal && signal.aborted) throw new GeminiError('Cancelled');
-        if (ctl.signal.aborted) throw new GeminiError('Gemini took too long to answer. Try again.');
+        if (ctl.signal.aborted) {
+          // a busy model: ask the next one rather than keep waiting
+          last = { message: 'Gemini is very busy right now and took too long to answer. Try again in a few minutes.', tryNext: true };
+          if (!isLast) { if (onStatus) onStatus('Gemini is busy. Asking its lighter model instead…'); break; }
+          throw new GeminiError(last.message);
+        }
         if (!simple) { simple = true; continue; }
         // Both forms failed before any answer. Safari does this when Google refuses the key before the photo has
         // finished uploading, so ask about the model alone, without the photo: a small request whose answer arrives.

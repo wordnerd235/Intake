@@ -14,6 +14,8 @@ test('buildRequest: the prompt, the photo, JSON mode with the schema (or without
   assert.equal(r.generationConfig.responseMimeType, 'application/json');
   assert.equal(r.generationConfig.responseSchema, SCHEMA);
   assert.equal(buildRequest('QUJD', 'image/jpeg', false).generationConfig.responseSchema, undefined);
+  assert.deepEqual(r.generationConfig.thinkingConfig, { thinkingLevel: 'low' }, 'quick answers by default');
+  assert.equal(buildRequest('QUJD', 'image/jpeg', true, false).generationConfig.thinkingConfig, undefined);
   assert.equal(MODELS[0], 'gemini-3.8-flash');
 });
 

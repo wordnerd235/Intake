@@ -5,7 +5,7 @@ import { MODELS, buildRequest, parseEstimate, explainError } from './meal-photo-
 
 const API = 'https://generativelanguage.googleapis.com/v1beta/models/';
 /** Longest side of the photo sent: plenty to judge portions, and a small upload. */
-const SIDE = 1280;
+const SIDE = 1024;
 const TIMEOUT_MS = 90000;
 
 /** Shrink a photo to a JPEG no larger than SIDE, as base64. */
@@ -38,6 +38,7 @@ export async function estimateMeal(photo, key, { signal, fetchFn = globalThis.fe
   // "simple" sends the key in the URL as text/plain: a request the browser makes without a CORS preflight. It is the
   // fallback when the normal request can't get through (some phones, content blockers and networks stop the preflight).
   let simple = false;
+  let quick = true; // low thinking; dropped if a model rejects the setting
   for (const model of MODELS) {
     for (let withSchema = true; ;) {
       const ctl = new AbortController();
@@ -47,7 +48,7 @@ export async function estimateMeal(photo, key, { signal, fetchFn = globalThis.fe
       let res = null;
       let body = null;
       try {
-        const payload = JSON.stringify(buildRequest(b64, 'image/jpeg', withSchema));
+        const payload = JSON.stringify(buildRequest(b64, 'image/jpeg', withSchema, quick));
         res = simple
           ? await fetchFn(`${API}${model}:generateContent?key=${encodeURIComponent(key)}`, { method: 'POST', credentials: 'omit', signal: ctl.signal, headers: { 'content-type': 'text/plain' }, body: payload })
           : await fetchFn(`${API}${model}:generateContent`, { method: 'POST', credentials: 'omit', signal: ctl.signal, headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: payload });
@@ -73,6 +74,7 @@ export async function estimateMeal(photo, key, { signal, fetchFn = globalThis.fe
       }
       if (res.ok) return parseEstimate(body);
       // a model that rejects the answer schema gets one try without it; anything else moves on or stops
+      if (res.status === 400 && quick && /thinking/i.test(JSON.stringify(body || ''))) { quick = false; continue; }
       if (res.status === 400 && withSchema && /schema|response_?mime|generation_?config/i.test(JSON.stringify(body || ''))) { withSchema = false; continue; }
       last = explainError(res.status, body);
       if (!last.tryNext) throw new GeminiError(last.message);

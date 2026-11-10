@@ -6,7 +6,7 @@ from pathlib import Path
 from playwright.sync_api import expect
 
 from helpers import FAKE_CAMERA, FAKE_OCR, NO_CAMERA, SHOTS, TINY_PNG, Net, clean_text, num, overflow, small_targets
-from sugars import added_sugars
+from sugars import added_sugars, saved_foods_refresh
 
 BANANA_KCAL = 105
 
@@ -1060,6 +1060,7 @@ class Scenario:
             ("copy day into a filled day: add or replace", self.copy_day_into_filled_day), ("thousands separator: 1,200 is 1200", self.thousands_separator), ("toast clears the Add button", self.toast_clears_add_button), ("toasts: low with a sheet, auto-dismiss, cleared on navigation", self.toasts_behave),
             ("compact totals are plain, Nutrients table has the legend", self.compact_totals_are_plain),
             ("total and added sugars: entered, not listed, noted, limit colors", lambda: added_sugars(self)),
+            ("saved products and recipes gain added sugars without a rescan", lambda: saved_foods_refresh(self)),
             ("online search + barcode entry (mocked)", self.online_search_and_barcode), ("Progress charts with data", lambda: (self.seed_history(), self.progress())),
             ("foods, more, account, diary screens", self.other_screens), ("units and calorie override", self.settings_flow),
             ("reload persists", self.reload_persists), ("export JSON, restore in a fresh browser", self.export_then_import),

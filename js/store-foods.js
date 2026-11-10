@@ -1,4 +1,5 @@
 // store-foods.js - custom foods, recipes, saved meals and foodMeta (favorites/recents). Mixed into the store.
+import { fillIngredientAddedSugar } from './food-refresh.js';
 
 const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
 
@@ -108,8 +109,50 @@ export function createFoodStore(c) {
     deleteMeal: (id) => tombstone('meals', id),
     restoreMeal: (rec) => mutate(async () => write('meals', { ...rec, deleted: false }, await adapter.get('meals', rec.id))),
 
+    /**
+     * Fill in added sugars on a recipe's ingredients from a fresh lookup of product `key` (see fillIngredientAddedSugar:
+     * only when total sugars still match). Nothing else in the recipe changes. Resolves to true when it changed.
+     */
+    fillRecipeAddedSugar: (id, key, fresh) =>
+      mutate(async () => {
+        const prev = await adapter.get('recipes', id);
+        if (!prev || prev.deleted) return false;
+        let changed = false;
+        const ingredients = (prev.ingredients || []).map((i) => {
+          const next = i.foodKey === key ? fillIngredientAddedSugar(i, fresh) : null;
+          if (next) changed = true;
+          return next || i;
+        });
+        if (changed) await write('recipes', { ...prev, ingredients }, prev);
+        return changed;
+      }),
+
     // ---- foodMeta: favorites / recents / frequent ----
     getFoodMeta: (key) => getLive('foodMeta', key),
+    /** Every live foodMeta record (recents, frequent and favorites). */
+    async listFoodMeta() {
+      return live(await adapter.all('foodMeta')).map(clean);
+    },
+    /**
+     * Products just fetched again from Open Food Facts or USDA (a scan, a search): replace the saved copy that Recents
+     * and Favorites use for any already used, so it stays current (added sugars included). Use counts and the last
+     * serving stay. Unused products, unchanged copies and other sources are left alone. Resolves to how many changed.
+     * @param {Object[]} foods
+     */
+    refreshSnapshots: (foods) =>
+      mutate(async () => {
+        let n = 0;
+        for (const f of foods || []) {
+          if (!f || !/^(off|fdc):/.test(f.key || '')) continue;
+          const prev = await adapter.get('foodMeta', f.key);
+          if (!prev || prev.deleted) continue;
+          const snap = snapshot(f);
+          if (JSON.stringify(snap) === JSON.stringify(prev.food)) continue;
+          await write('foodMeta', { ...prev, food: snap }, prev);
+          n++;
+        }
+        return n;
+      }),
     touchFoodMeta: (food, serving, qty) =>
       mutate(async () => {
         if (!food || !food.key || food.key === 'quick') return null;

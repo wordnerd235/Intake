@@ -230,6 +230,7 @@ export async function openAddFood(o = {}) {
     let error = null;
     try {
       foods = await searchFDC(q, settings.fdcApiKey, { signal: onlineCtl.signal });
+      keepCurrent(foods);
     } catch (e) {
       if (e.kind === 'aborted') return;
       error = e;
@@ -259,12 +260,18 @@ export async function openAddFood(o = {}) {
     btn.replaceWith(box);
     try {
       const foods = await searchOFFWithRetry(q, { signal: onlineCtl ? onlineCtl.signal : undefined });
+      keepCurrent(foods);
       if (my !== seq) return;
       box.replaceChildren(...(foods.length ? rankByNameAndBrand(foods, q).map((f) => foodRow(f, null)) : [hint(`No Open Food Facts results for "${q}".`)]), h('p', { class: 'credit' }, 'Data: Open Food Facts (ODbL)'));
     } catch (e) {
       if (my !== seq || e.kind === 'aborted') return;
       box.replaceChildren(notice(describeError(e, 'Open Food Facts'), 'warn', button('Retry', (ev) => searchOFFInto(my, q, ev.currentTarget.closest('.off-results')), { variant: 'ghost' })));
     }
+  }
+
+  /** Fresh results from a search or scan also refresh the saved copy Recents and Favorites use for those products. */
+  function keepCurrent(foods) {
+    store.refreshSnapshots(foods).catch(() => {}); // a failed refresh only means the old copy stays a little longer
   }
 
   async function lookup(code) {
@@ -285,7 +292,7 @@ export async function openAddFood(o = {}) {
         if (r.food) found = r.food;
       } catch (e) { failure = failure || e; }
     }
-    if (found) { run(); return openDetail(found); }
+    if (found) { keepCurrent([found]); run(); return openDetail(found); }
     const msg = failure && !name ? `${describeError(failure, 'Barcode lookup')}` : reason === 'no-nutrition' ? `"${name || code}" is in the database but has no nutrition data. You can create it yourself.` : `No product found for ${code}. Try searching by name, or create the food yourself.`;
     results.replaceChildren(section(null, [notice(msg, 'warn'), h('div', { class: 'btn-row left' }, button('Create food', () => openFoodEditor({ prefill: { name }, onSaved: (rec) => openDetail(customAsFood(rec)) }), { variant: 'primary' }), button('Back to search', () => run(), { variant: 'ghost' }))]));
   }

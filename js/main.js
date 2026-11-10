@@ -10,6 +10,8 @@ import { bus } from './bus.js';
 import { cloud } from './cloud.js';
 import { startTabSync } from './tabsync.js';
 import { APP_VERSION } from './version.js';
+import { refreshSavedFoods, refreshMessage } from './food-refresh.js';
+import { fetchSavedFood } from './online-foods.js';
 
 const FAB_ROUTES = new Set(['today', 'diary']);
 
@@ -77,6 +79,28 @@ function registerServiceWorker(banner) {
 }
 
 let freshTimer = 0;
+let refreshing = false;
+
+/**
+ * Once per start (and again when the connection returns, if a run was cut short): look commercial products saved
+ * before added sugars existed up again and fill them in (food-refresh.js). Quiet unless something changed.
+ */
+async function refreshSaved() {
+  if (refreshing || navigator.onLine === false || !appFlags.onboarded) return;
+  refreshing = true;
+  try {
+    const { fdcApiKey } = await store.getSettings();
+    const run = () => refreshSavedFoods({ store, fetchFood: (key) => fetchSavedFood(key, fdcApiKey) });
+    // one tab at a time: with two tabs open, the second skips instead of asking the same questions again
+    const r = navigator.locks ? await navigator.locks.request('intake-food-refresh', { ifAvailable: true }, (lock) => (lock ? run() : null)) : await run();
+    const msg = r ? refreshMessage(r) : '';
+    if (msg) toast(msg);
+  } catch (e) {
+    console.warn('Saved food refresh stopped', e);
+  } finally {
+    refreshing = false;
+  }
+}
 
 async function start() {
   const app = document.getElementById('app');
@@ -130,6 +154,8 @@ async function start() {
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   registerServiceWorker(banner);
   if (cloud.configured) setTimeout(() => cloud.init(), 200);
+  setTimeout(refreshSaved, 6000); // after sync has had a moment to bring in the other device's saved foods
+  window.addEventListener('online', () => setTimeout(refreshSaved, 3000));
   document.documentElement.dataset.version = APP_VERSION;
 }
 

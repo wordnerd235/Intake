@@ -140,3 +140,57 @@ def _added_sugars(sc):
     expect(p.locator("label[for=nt-addedSugar]")).to_contain_text("limit")
     expect(p.locator("#nt-sugar")).to_have_count(0)
     targets.locator("summary").click()
+
+
+SEED_OLD_SAVED = """async () => {
+  const { store } = await import('./js/store.js');
+  const old = { key: 'off:0073130002005', name: 'Sourdough Test Loaf', brand: 'Bakeco', source: 'off',
+    per100g: { kcal: 250, carbs: 48, sugar: 4, fat: 2, protein: 9 }, servings: [{ label: '1 slice (50 g)', grams: 50 }] };
+  await store.touchFoodMeta(old, old.servings[0], 1);  // in Recents, saved before added sugars existed
+  await store.saveRecipe({ name: 'Zz sourdough toast', servings: 1, ingredients: [
+    { foodKey: old.key, name: old.name, brand: old.brand, serving: old.servings[0], qty: 2, per: { kcal: 125, carbs: 24, sugar: 2, fat: 1, protein: 4.5 } }] });
+}"""
+
+
+def saved_foods_refresh(sc):
+    """Commercial products saved before added sugars existed are looked up again in the background after a start."""
+    p = sc.page
+    try:
+        p.evaluate(SEED_OLD_SAVED)
+        before = sc.net.count("api/v2/product/0073130002005")
+        p.reload()
+        expect(p.locator(".toast-msg")).to_have_text("Added sugars filled in for 1 saved food and 1 recipe.", timeout=20000)
+        assert sc.net.count("api/v2/product/0073130002005") == before + 1, "looked up once"
+        sc.open_add()
+        sc.search("sourdough test")
+        sc.pick_result("Sourdough Test Loaf")
+        facts = p.locator(".sheet .facts").last
+        expect(facts.locator(".fact.sub2", has_text="Added sugars")).to_contain_text("1 g")  # 2 g per 100 g, 50 g slice
+        sc.close_sheets()
+        sc.open_add()
+        sc.search("zz sourdough")
+        sc.pick_result("Zz sourdough toast")
+        facts = p.locator(".sheet .facts").last
+        expect(facts.locator(".fact.sub2", has_text="Added sugars")).to_contain_text("2 g")  # two slices
+        sc.close_sheets()
+        # the next start asks nothing again
+        p.reload()
+        p.wait_for_timeout(7500)
+        assert sc.net.count("api/v2/product/0073130002005") == before + 1, "not looked up a second time"
+        # fix 1: a barcode lookup (without logging) brings an outdated saved copy up to date
+        p.evaluate("""async () => { const { store } = await import('./js/store.js');
+          await store.touchFoodMeta({ key: 'off:3017620422003', name: 'Hazelnut Spread Test', brand: 'Testco', source: 'off',
+            per100g: { kcal: 500, sugar: 50 }, servings: [{ label: '15 g', grams: 15 }] }, { label: '15 g', grams: 15 }, 1); }""")
+        sc.open_add()
+        p.get_by_role("button", name="Scan a barcode").click()
+        p.fill("#bc-manual", "3017620422003")
+        p.get_by_role("button", name="Look up").click()
+        expect(p.locator("#fd-qty")).to_be_visible()
+        sc.close_sheets()
+        kcal = p.evaluate("""async () => { const { store } = await import('./js/store.js');
+          for (let i = 0; i < 20; i++) { const m = await store.getFoodMeta('off:3017620422003'); if (m.food.per100g.kcal !== 500) return m.food.per100g.kcal;
+            await new Promise((r) => setTimeout(r, 100)); } return 500; }""")
+        assert kcal == 539, f"saved copy still {kcal} kcal per 100 g after the lookup"
+    finally:
+        sc.close_sheets()
+        sc.goto("#/today")

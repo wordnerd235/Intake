@@ -65,6 +65,11 @@ OFF_PRODUCT = {
     "code": "3017620422003", "product_name": "Hazelnut Spread Test", "brands": "Testco, Other", "serving_size": "15 g", "serving_quantity": 15,
     "nutriments": {"energy-kcal_100g": 539, "proteins_100g": 6.3, "carbohydrates_100g": 57.5, "fat_100g": 30.9, "saturated-fat_100g": 10.6, "sugars_100g": 56.3, "salt_100g": 0.107, "fiber_100g": 0},
 }
+# A product saved before added sugars existed, as Open Food Facts lists it today (with added sugars).
+SOURDOUGH = {
+    "code": "0073130002005", "product_name": "Sourdough Test Loaf", "brands": "Bakeco", "serving_size": "1 slice (50 g)", "serving_quantity": 50,
+    "nutriments": {"energy-kcal_100g": 250, "carbohydrates_100g": 48, "sugars_100g": 4, "added-sugars_100g": 2, "fat_100g": 2, "proteins_100g": 9},
+}
 FDC_FOOD = {
     "fdcId": 424242, "description": "MOCK CRUNCHY CEREAL BAR", "brandName": "MOCKCO", "gtinUpc": "0123456789012", "servingSize": 40, "servingSizeUnit": "g",
     "householdServingFullText": "1 bar",
@@ -130,8 +135,12 @@ class Net:
                 return ok({"products": []})
             if "openfoodfacts.org/api/v2/product/3017620422003" in url:
                 return ok({"status": 1, "product": OFF_PRODUCT})
+            if "openfoodfacts.org/api/v2/product/0073130002005" in url:
+                return ok({"status": 1, "product": SOURDOUGH})
             if "openfoodfacts.org/api/v2/product/" in url:
                 return ok({"status": 0})
+            if "nal.usda.gov/fdc/v1/food/424242" in url:  # the details endpoint, used to look a saved USDA product up again
+                return ok(FDC_FOOD)
             if "nal.usda.gov/fdc/v1/foods/search" in url:
                 return ok({"foods": [FDC_FOOD]})
             if self.fake_firebase and "gstatic.com/firebasejs/" in url:

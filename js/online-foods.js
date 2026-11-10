@@ -151,6 +151,35 @@ export async function barcodeFDC(code, apiKey, o = {}) {
   return food ? { food } : { food: null, reason: hit ? 'no-nutrition' : 'not-found' };
 }
 
+/**
+ * One USDA branded food by its FDC id (the food details endpoint; nutrients per 100 g).
+ * @param {string|number} id
+ * @param {string} apiKey user key or ''
+ * @returns {Promise<Object|null>} Food, or null when USDA no longer has it or it has no nutrition
+ */
+export async function foodFDC(id, apiKey, o = {}) {
+  const k = apiKey || 'DEMO_KEY';
+  try {
+    return normalizeFDC(await getJson(`https://api.nal.usda.gov/fdc/v1/food/${encodeURIComponent(id)}?api_key=${encodeURIComponent(k)}`, o));
+  } catch (e) {
+    if (e.kind === 'http' && e.status === 404) return null;
+    throw e;
+  }
+}
+
+/**
+ * Look a saved product up again by its food key: Open Food Facts by barcode ("off:<code>"), USDA by id ("fdc:<id>").
+ * @param {string} key
+ * @param {string} apiKey USDA key or ''
+ * @returns {Promise<Object|null>} Food, or null when it is gone or has no nutrition
+ */
+export async function fetchSavedFood(key, apiKey, o = {}) {
+  const [source, id] = [key.slice(0, key.indexOf(':')), key.slice(key.indexOf(':') + 1)];
+  if (source === 'off' && isBarcode(id)) return (await barcodeOFF(id, o)).food;
+  if (source === 'fdc' && /^\d+$/.test(id)) return foodFDC(id, apiKey, o);
+  return null;
+}
+
 /** Friendly sentence for any lookup failure. */
 export function describeError(e, what = 'online foods') {
   if (e && e.kind === 'rate') return e.message;

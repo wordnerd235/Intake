@@ -43,7 +43,7 @@ js/
   ppocr-core.js          PURE PP-OCR post-processing: DB boxes from the probability map, straightened crops, CTC decode, line rebuild
   meal-photo-core.js     PURE meal photo estimate: Gemini request/schema, answer parsing, USDA match (kcal within max(25, 20%)), diary entries, error text
   gemini.js              Gemini generateContent call (the person's own key, x-goog-api-key; gemini-3.8-flash then Flash-Lite), 30 s on Flash before Flash-Lite, photo shrunk to 1024 px JPEG, thinkingLevel low (dropped if refused)
-  label-parse.js         PURE parser for label text (OCR noise: lost "g" read as 9 checked against % DV, O for 0, Added Sugars skipped)
+  label-parse.js         PURE parser for label text (OCR noise: lost "g" read as 9 checked against % DV, O for 0; "Includes Xg Added Sugars" read as addedSugar)
   charts.js              SVG: ring, line (with trend + goal line), bars (with target line), sparkline
   views/
     onboarding.js today.js diary.js add-food.js food-detail.js exercise.js
@@ -57,9 +57,10 @@ README.md
 
 ## 3. Nutrients
 
-`NUTRIENTS = ['kcal','protein','carbs','fat','fiber','sugar','satFat','transFat','cholesterol','sodium','potassium','calcium','iron','vitA','vitC','vitD']`
-Units: kcal; g ×7 (protein..transFat); mg: cholesterol, sodium, potassium, calcium, iron, vitC; µg: vitA (RAE), vitD.
-A nutrients object may omit keys or hold `null` (unknown). Sums treat unknown as 0 but track whether any contributor was unknown (show "—" or "≥" where useful; at minimum don't crash or show NaN).
+`NUTRIENTS = ['kcal','protein','carbs','fat','fiber','sugar','addedSugar','satFat','transFat','cholesterol','sodium','potassium','calcium','iron','vitA','vitC','vitD']`
+Units: kcal; g ×8 (protein..transFat); mg: cholesterol, sodium, potassium, calcium, iron, vitC; µg: vitA (RAE), vitD.
+`sugar` is **total sugars** (every value stored before `addedSugar` existed is a total); `addedSugar` is the part of it a US label lists as "Includes Xg Added Sugars". Sources: FDC total = nutrient 269 / id 2000 (or id 1063), added = 539 / id 1235; OFF `sugars_100g` / `added-sugars_100g` (or `_serving` scaled by `serving_quantity`); label scan; Gemini (added may be null). SR Legacy (`data/foods.json`) has no added sugars, so offline foods leave it unknown.
+A nutrients object may omit keys or hold `null` (unknown). Sums treat unknown as 0 but track whether any contributor was unknown, and how many (show "—" or "≥" where useful; at minimum don't crash or show NaN). Unknown added sugars are never stored as 0: the food shows "not listed", the day leaves it out of the total and notes how many foods didn't list it, and a recipe has added sugars only when every ingredient lists them.
 
 ## 4. Data model (IndexedDB `intake`, one object store per collection)
 
@@ -112,7 +113,7 @@ Settings `profile`: `units {weight:'lb'|'kg', height:'ftin'|'cm', water:'oz'|'ml
 - Pace choices in UI: 0.25/0.5/0.75/1 kg or 0.5/1/1.5/2 lb per week.
 - Daily budget = target + (addExerciseCalories ? exercise kcal : 0). Remaining = budget − food kcal.
 - Macro grams = target × pct / {4,4,9}; percentages must sum to 100 (UI enforces).
-- Default nutrient targets: fiber 14 g per 1000 kcal; sodium ≤ 2300 mg; satFat ≤ 10% kcal /9; sugar shown informational (no target); cholesterol ≤ 300 mg; potassium 3400 (m)/2600 (f); calcium 1000; iron 8 (m)/18 (f); vitA 900/700 µg; vitC 90/75 mg; vitD 15 µg. "≤" targets are limits (green while under, warning color once over; under is not claimed when some foods lack data); calories, carbs and fat are limits too. Others are goals (green once reached).
+- Default nutrient targets: fiber 14 g per 1000 kcal; sodium ≤ 2300 mg; satFat ≤ 10% kcal /9; total sugars shown with a plain bar (share of the day's carbs, never a limit color; no target); added sugars ≤ 50 g (FDA Daily Value; an old `nutrientTargets.sugar` moves to `addedSugar` via `migrateProfile`); cholesterol ≤ 300 mg; potassium 3400 (m)/2600 (f); calcium 1000; iron 8 (m)/18 (f); vitA 900/700 µg; vitC 90/75 mg; vitD 15 µg. "≤" targets are limits (green while under, warning color once over; under is not claimed when some foods lack data); calories, carbs and fat are limits too. Others are goals (green once reached).
 - Exercise kcal = `MET × kg × minutes/60`, rounded; user may override.
 - Trend weight: exponential moving average, α = 0.1, over daily weigh-ins (carry forward across gaps). BMI = kg / m². Projection: goal date from trend slope over last 4 weeks (only if moving toward goal), else "—".
 
@@ -122,7 +123,7 @@ Settings `profile`: `units {weight:'lb'|'kg', height:'ftin'|'cm', water:'oz'|'ml
 
 - **Onboarding** (first run, skippable): units → sex, birth year, height, weight → goal weight + pace + activity → shows resulting daily calorie budget with a one-line explanation → optional "Sign in to sync" (only if Firebase configured).
 - **Today**: calorie ring (budget / eaten / exercise / remaining, red when over), macro bars (g vs target, P/C/F colors), water card (tap +1 glass = 8 oz or 250 ml, long-press/menu to set exact; progress), weight card (enter today's weight; sparkline of trend 30 d), meal summary rows (kcal per meal → tap goes to Diary), streak ("N days logged"), note preview.
-- **Diary**: meal sections (custom names) with entries: name, brand (muted), "1.5 × 1 cup" serving text, kcal. Tap entry → edit sheet (qty, unit, meal, delete). Per-meal: subtotal kcal + P/C/F, "+ Add food", overflow menu: copy from yesterday, copy to date…, save as meal, clear. Exercise section ("+ Add exercise"). Water + note. Footer: day totals and **Nutrients** sheet — full table for all 16 nutrients: amount, target, % bar, limit/goal styling.
+- **Diary**: meal sections (custom names) with entries: name, brand (muted), "1.5 × 1 cup" serving text, kcal. Tap entry → edit sheet (qty, unit, meal, delete). Per-meal: subtotal kcal + P/C/F, "+ Add food", overflow menu: copy from yesterday, copy to date…, save as meal, clear. Exercise section ("+ Add exercise"). Water + note. Footer: day totals and **Nutrients** sheet — full table for all 17 nutrients: amount, target, % bar, limit/goal styling (added sugars: limit colors and a "not listed for N of M foods" note; total sugars: plain bar).
 - **Add food sheet** (full-screen on phone, large modal on desktop): search box (autofocus), barcode button, nutrition label scan button (live camera with hints like "Hold steady" / "Move closer"; it snaps once the label is steady, sharp and fills the frame, or on a tap; an automatic read must find calories + 4 core rows, else it retries up to 3 times and offers "Use what it read"; photo, clipboard and paste fallbacks; result opens Create food prefilled, to check before saving), meal photo button (plate icon, log mode only: a photo of a plate goes to Google Gemini with the key saved in More; each food it lists uses the USDA food when the calories agree, else its own estimate logged like Quick add "(photo estimate)"; the person edits grams or removes rows, picks the meal and adds all at once, with Undo), tabs/chips: All · Recent · Frequent · Favorites · My foods · Recipes · Meals. Bottom actions: Quick add, Create food. Tapping a result → **Food detail**: amount input (fractions OK) + unit select, meal select, date shown, live nutrition-facts panel (kcal, P/C/F, then rest), favorite star, "Add" button. After add: toast "Added to Lunch · Undo", sheet stays open for the next item (search cleared), close returns to Diary. Saved meal → adds all its items. Recipe → logs servings of the recipe.
 - **Exercise sheet**: search exercises.json + recents; minutes input; computed kcal shown live (editable); custom exercise (name + kcal).
 - **Progress**: range chips 1M · 3M · 6M · 1Y · All. Weight chart (dots for weigh-ins, line for trend, dashed goal line, axis labels in user units), stats (start, current trend, change, to goal, BMI, projected goal date), weigh-in list with edit/delete. Calories chart: daily intake bars vs target line (days with no logs blank). Averages for range: kcal, P/C/F grams and % of kcal, fiber, sodium. Water chart.

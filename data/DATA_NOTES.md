@@ -75,6 +75,7 @@ Nutrient mapping (FDC nutrient id / SR number / unit):
 | fat | Total lipid (fat) | 1004 | 204 | g |
 | fiber | Fiber, total dietary | 1079 | 291 | g |
 | sugar | Sugars, total including NLEA | 2000 | 269 | g |
+| (addedSugar) | Sugars, added: **not in SR Legacy** (0 of its food_nutrient rows use id 1235), so the app treats it as unknown for every offline food. Not in foods.json. | 1235 | 539 | g |
 | satFat | Fatty acids, total saturated | 1258 | 606 | g |
 | transFat | Fatty acids, total trans | 1257 | 605 | g |
 | cholesterol | Cholesterol | 1253 | 601 | mg |

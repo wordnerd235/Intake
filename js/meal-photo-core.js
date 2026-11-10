@@ -12,6 +12,8 @@ For each item give:
 - search: 2 to 5 plain words to find the plain food in the USDA database ("chicken thigh roasted", "rice white cooked", "broccoli cooked").
 - grams: the edible weight you see. Judge size from the plate (a dinner plate is about 27 cm across), bowl, utensils, hands and packaging.
 - kcal, protein, carbs, fat (grams) for that weight, including oil, butter, sauce or dressing you can see or that the dish is normally made with.
+- sugar: total sugars in grams for that weight (natural and added together, like "Total Sugars" on a US label).
+- addedSugar: the grams of that sugar that were added (sugar, syrup, honey or juice concentrate put in when making it, like "Includes Added Sugars" on a US label; the natural sugar in fruit, vegetables and plain milk is not added). Use null when you can't reasonably tell.
 Also give note: one short sentence naming your biggest assumption (for example the cooking fat or a hidden ingredient).
 If there is no food or drink in the photo, return an empty items list and say so in note.`;
 
@@ -31,6 +33,8 @@ export const SCHEMA = {
           protein: { type: 'NUMBER' },
           carbs: { type: 'NUMBER' },
           fat: { type: 'NUMBER' },
+          sugar: { type: 'NUMBER', nullable: true },
+          addedSugar: { type: 'NUMBER', nullable: true },
         },
         required: ['name', 'search', 'grams', 'kcal', 'protein', 'carbs', 'fat'],
       },
@@ -64,7 +68,8 @@ const text = (v, max) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().
 /**
  * Read Gemini's answer (the response JSON, or just its text) into a clean list. Anything malformed is dropped.
  * @param {Object|string} res generateContent response, or the model's text
- * @returns {{items:Array<{name:string, search:string, grams:number, kcal:number, protein:number|null, carbs:number|null, fat:number|null}>, note:string, blocked:string}}
+ * Added sugars are kept only when given and no more than the total sugars; otherwise they stay null (not listed).
+ * @returns {{items:Array<{name:string, search:string, grams:number, kcal:number, protein:number|null, carbs:number|null, fat:number|null, sugar:number|null, addedSugar:number|null}>, note:string, blocked:string}}
  */
 export function parseEstimate(res) {
   let t = res;
@@ -85,8 +90,11 @@ export function parseEstimate(res) {
     const grams = clampNum(r.grams, 5000);
     const kcal = clampNum(r.kcal, LIMITS.kcal);
     if (!name || !grams || kcal == null) continue;
+    const sugar = r.sugar == null ? null : clampNum(r.sugar, LIMITS.macroGrams);
+    let addedSugar = r.addedSugar == null ? null : clampNum(r.addedSugar, LIMITS.macroGrams);
+    if (addedSugar != null && (sugar == null || addedSugar > sugar)) addedSugar = null;
     items.push({ name, search: text(r.search, 80) || name, grams: Math.round(grams), kcal: Math.round(kcal),
-      protein: clampNum(r.protein, LIMITS.macroGrams), carbs: clampNum(r.carbs, LIMITS.macroGrams), fat: clampNum(r.fat, LIMITS.macroGrams) });
+      protein: clampNum(r.protein, LIMITS.macroGrams), carbs: clampNum(r.carbs, LIMITS.macroGrams), fat: clampNum(r.fat, LIMITS.macroGrams), sugar, addedSugar });
   }
   return { items, note: text(j && j.note, 240), blocked };
 }
@@ -113,7 +121,7 @@ export function pickMatch(item, candidates) {
 
 /**
  * The nutrients for an item at `grams`: from its USDA match, else Gemini's estimate scaled to the new weight.
- * @param {{grams:number, kcal:number, protein:number|null, carbs:number|null, fat:number|null}} item as Gemini sent it
+ * @param {{grams:number, kcal:number, protein:number|null, carbs:number|null, fat:number|null, sugar?:number|null, addedSugar?:number|null}} item as Gemini sent it
  * @param {Object|null} match USDA food
  * @param {number} grams
  * @returns {Record<string, number|null>}
@@ -121,7 +129,8 @@ export function pickMatch(item, candidates) {
 export function itemNutrients(item, match, grams) {
   if (match && match.per100g) return scaleNutrients(match.per100g, grams / 100);
   const k = item.grams ? grams / item.grams : 0;
-  return { ...emptyNutrients(), kcal: item.kcal * k, protein: item.protein == null ? null : item.protein * k, carbs: item.carbs == null ? null : item.carbs * k, fat: item.fat == null ? null : item.fat * k };
+  const sc = (v) => (v == null ? null : v * k);
+  return { ...emptyNutrients(), kcal: item.kcal * k, protein: sc(item.protein), carbs: sc(item.carbs), fat: sc(item.fat), sugar: sc(item.sugar), addedSugar: sc(item.addedSugar) };
 }
 
 /**

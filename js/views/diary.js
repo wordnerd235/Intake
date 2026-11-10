@@ -165,7 +165,7 @@ export async function mount(root) {
     ], { cls: 'totals-card' });
     cols.replaceChildren(
       h('div', { class: 'col' }, d.byMeal.map((m) => mealCard(d, m)), exerciseCard(d), waterNoteCard(d), totals),
-      h('div', { class: 'col side-col' }, summary(d), card('Nutrients', nutrientsTable(d.total, d.unknown, d.targets), { cls: 'only-wide' })),
+      h('div', { class: 'col side-col' }, summary(d), card('Nutrients', nutrientsTable(d.total, d.unknown, d.targets, d), { cls: 'only-wide' })),
     );
   };
   const redraw = rafOnce(draw);

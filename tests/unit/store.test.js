@@ -75,7 +75,8 @@ test('validation: bad qty / missing name rejected; per sanitised', async () => {
   assert.equal(a.per.kcal, 50);
   assert.equal(a.per.protein, null);
   assert.ok(!('bogus' in a.per));
-  assert.equal(Object.keys(a.per).length, 16);
+  assert.equal(Object.keys(a.per).length, 17);
+  assert.equal(a.per.addedSugar, null, 'a missing added sugars stays unknown');
   await assert.rejects(() => s.updateLog(a.id, { qty: -1 }), /greater than zero/);
   await assert.rejects(() => s.updateLog('nope', { qty: 1 }), /not found/);
 });

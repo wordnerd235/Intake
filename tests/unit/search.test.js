@@ -109,7 +109,8 @@ for (const [label, path] of sources) {
     const f = rowToFood(doc.foods.find((r) => r[1] === 'Bananas, raw'), doc.nutrients);
     assert.match(f.key, /^usda:\d+$/);
     assert.equal(f.source, 'usda');
-    assert.equal(Object.keys(f.per100g).length, 16);
+    assert.equal(Object.keys(f.per100g).length, 17);
+    assert.equal(f.per100g.addedSugar, null, 'SR Legacy has no added sugars: not listed, never 0');
     assert.ok(f.per100g.kcal > 80 && f.per100g.kcal < 100);
     assert.ok(f.servings.length >= 1 && f.servings.every((s) => s.label && s.grams > 0));
     assert.ok(f.servings.some((s) => /medium/.test(s.label) && Math.abs(s.grams - 118) < 2));

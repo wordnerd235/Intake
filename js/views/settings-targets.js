@@ -1,7 +1,7 @@
 // views/settings-targets.js - macro split (three linked sliders summing to 100) and per-nutrient target overrides.
 import { h, field, numInput, toast } from '../ui.js';
 import { store } from '../store.js';
-import { NUTRIENTS, NUTRIENT_INFO, resolveTargets, calorieTarget, rebalance } from '../nutrition.js';
+import { NUTRIENTS, NUTRIENT_INFO, NO_TARGET_KEYS, resolveTargets, calorieTarget, rebalance } from '../nutrition.js';
 import { fmtNutrient } from '../facts.js';
 import { fmtInt } from '../units.js';
 
@@ -35,7 +35,7 @@ export function macroSection(settings, kcal, onSaved) {
 /** Nutrient target overrides table. */
 export function targetsSection(settings, kcal) {
   const defaults = resolveTargets({ ...settings, nutrientTargets: {} }, kcal);
-  const keys = NUTRIENTS.filter((k) => !['kcal', 'protein', 'carbs', 'fat'].includes(k));
+  const keys = NUTRIENTS.filter((k) => !['kcal', 'protein', 'carbs', 'fat'].includes(k) && !NO_TARGET_KEYS.has(k)); // total sugars has no target; added sugars does
   const inputs = {};
   const rows = keys.map((k) => {
     const info = NUTRIENT_INFO[k];
@@ -56,7 +56,7 @@ export function targetsSection(settings, kcal) {
       if (v == null) delete next[k]; else next[k] = v;
       await store.saveSettings({ nutrientTargets: next });
     });
-    const kind = (d.kind || (k === 'sugar' || k === 'transFat' ? 'limit' : 'goal')) === 'limit' ? 'limit (stay under)' : 'goal (reach)';
+    const kind = (d.kind || (k === 'transFat' ? 'limit' : 'goal')) === 'limit' ? 'limit (stay under)' : 'goal (reach)';
     return h('div', { class: 'target-row' }, h('label', { for: `nt-${k}` }, info.label, h('small', null, ` ${kind}`)), inp.el);
   });
   return h('details', { class: 'more' }, h('summary', null, 'Nutrient targets'), h('p', { class: 'muted small' }, 'Leave a box empty to use the default shown in grey. Limits are green while you stay under and red once you go over; goals turn green when reached.'), h('div', { class: 'target-grid' }, rows));

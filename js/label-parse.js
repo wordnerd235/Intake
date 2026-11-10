@@ -24,10 +24,10 @@ const ROWS = [
 ];
 
 /** The unit each nutrient is stored in, and what a label unit converts to it. */
-const STORE_UNIT = { fat: 'g', satFat: 'g', transFat: 'g', fiber: 'g', sugar: 'g', carbs: 'g', protein: 'g', cholesterol: 'mg', sodium: 'mg', calcium: 'mg', iron: 'mg', potassium: 'mg', vitC: 'mg', vitD: 'µg', vitA: 'µg' };
+const STORE_UNIT = { fat: 'g', satFat: 'g', transFat: 'g', fiber: 'g', sugar: 'g', addedSugar: 'g', carbs: 'g', protein: 'g', cholesterol: 'mg', sodium: 'mg', calcium: 'mg', iron: 'mg', potassium: 'mg', vitC: 'mg', vitD: 'µg', vitA: 'µg' };
 const TO_BASE = { g: 1, mg: 1e-3, mcg: 1e-6, µg: 1e-6, ug: 1e-6 };
 /** Most a single serving can plausibly hold, in the stored unit; anything above is an OCR misread. */
-const SANE = { kcal: 3000, fat: 200, satFat: 100, transFat: 50, fiber: 100, sugar: 300, carbs: 400, protein: 200, cholesterol: 3000, sodium: 20000, calcium: 5000, iron: 200, potassium: 10000, vitC: 5000, vitD: 500, vitA: 10000 };
+const SANE = { kcal: 3000, fat: 200, satFat: 100, transFat: 50, fiber: 100, sugar: 300, addedSugar: 300, carbs: 400, protein: 200, cholesterol: 3000, sodium: 20000, calcium: 5000, iron: 200, potassium: 10000, vitC: 5000, vitD: 500, vitA: 10000 };
 
 /**
  * Tidy one OCR line: lowercase, unify the micro sign, turn letter-O / l / I inside numbers into digits, drop stray symbols.
@@ -51,8 +51,8 @@ export function cleanLine(line) {
     .trim();
 }
 
-/** Row names as printed, for repairing OCR misspellings ("dietary fber", "potassaum", "satarated fat", "totalsugars"). */
-const NAMES = ['serving size', 'calories', 'total fat', 'saturated fat', 'trans fat', 'cholesterol', 'sodium', 'total carbohydrate', 'dietary fiber', 'total sugars', 'protein', 'vitamin d', 'calcium', 'iron', 'potassium', 'vitamin a', 'vitamin c'];
+/** Row names as printed, for repairing OCR misspellings ("dietary fber", "potassaum", "satarated fat", "totalsugars", "lncludes"). */
+const NAMES = ['serving size', 'calories', 'total fat', 'saturated fat', 'trans fat', 'cholesterol', 'sodium', 'total carbohydrate', 'dietary fiber', 'total sugars', 'includes', 'added sugars', 'protein', 'vitamin d', 'calcium', 'iron', 'potassium', 'vitamin a', 'vitamin c'];
 
 /** Levenshtein distance, stopping early once it exceeds `max`. */
 function editDistance(a, b, max) {
@@ -94,7 +94,7 @@ export function repairName(line) {
 }
 
 /** Where a nutrient row starts, for labels that print several on one line ("Calcium 390mg 30% · Potassium 470mg 10%"). */
-const ROW_START = /total\s*fat|sat(?:urated)?\.?\s*fat|trans\s*fat|cholest|sodium|total\s*carb|dietary\s*fib|total\s*sugars|incl(?:udes|\.)|protein|vit(?:amin|\.)?\s*[adc](?![a-z])|vitamin\s*b|calcium|iron|potas|thiamin|riboflavin|niacin|folate|zinc|magnesium|phosphorus/g;
+const ROW_START = /total\s*fat|sat(?:urated)?\.?\s*fat|trans\s*fat|cholest|sodium|total\s*carb|dietary\s*fib|total\s*sugars|incl(?:udes|uye|\.)|protein|vit(?:amin|\.)?\s*[adc](?![a-z])|vitamin\s*b|calcium|iron|potas|thiamin|riboflavin|niacin|folate|zinc|magnesium|phosphorus/g;
 
 /**
  * Split a cleaned line into one line per nutrient row. A row name starts a new row only once a number has been read on
@@ -120,7 +120,7 @@ export function splitRows(line) {
 }
 
 /** FDA Daily Values (2016 label rules), in label units, to check an amount against the % DV printed next to it. */
-const DV = { fat: 78, satFat: 20, cholesterol: 300, sodium: 2300, carbs: 275, fiber: 28, protein: 50, vitD: 20, calcium: 1300, iron: 18, potassium: 4700 };
+const DV = { fat: 78, satFat: 20, cholesterol: 300, sodium: 2300, carbs: 275, fiber: 28, addedSugar: 50, protein: 50, vitD: 20, calcium: 1300, iron: 18, potassium: 4700 };
 
 /**
  * The first amount on a label line: number + optional unit ("8g", "160 mg", "2.5 g", "<1g", "1,200mg"), skipping % DV
@@ -147,7 +147,7 @@ function amount(rest) {
 }
 
 /** Grams per serving above which a bare number ending in 9 is more likely a misread "g" than a real amount. */
-const TYPICAL_G = { fat: 100, satFat: 40, transFat: 10, fiber: 40, sugar: 100, carbs: 150, protein: 80 };
+const TYPICAL_G = { fat: 100, satFat: 40, transFat: 10, fiber: 40, sugar: 100, addedSugar: 100, carbs: 150, protein: 80 };
 /**
  * Most a serving normally holds, for numbers read with no unit beside them: above this a bare number is more likely a
  * misread "%" ("1%" read as "196") or a merged column than a real amount, so it is left blank for the person to fill.
@@ -198,6 +198,32 @@ function serving(text) {
   return { label: plainGrams || !label ? '1 serving' : label.slice(0, 60), grams: grams && grams > 0 && grams <= 5000 ? grams : null };
 }
 
+/** "Added sugars" in English, or the Spanish of a bilingual label ("azúcares añadidos/agregados", accents lost to OCR). */
+const ADDED = /add?ed\s*sugars?|a\s?[nñ]?adid|agregad/;
+
+/**
+ * Added sugars, printed under Total Sugars as "Includes 10g Added Sugars 20%" (or "Incl. 10g ...", "Incluye 10g de
+ * azúcares añadidos", and on some labels "Added Sugars 10g"). The amount may come before or after the name; the % DV
+ * at the end of the line checks a lost "g" (DV 50 g). The word "Added" may sit on the next line.
+ * @param {string} line a cleaned, repaired line
+ * @param {string} [next] the line after it
+ * @returns {{v:number|null}|null} null when the line is not about added sugars; v null when it is but no amount was read
+ */
+function addedSugarRow(line, next = '') {
+  const inc = line.match(/^(?:incluye|includes?|incl\.?)\s*/);
+  const named = !inc && line.match(/^(?:add?ed\s*sugars?)/);
+  if (!inc && !named) return null;
+  if (inc && !ADDED.test(line) && !ADDED.test(next.slice(0, 20))) return null;
+  const rest = line.slice((inc || named)[0].length);
+  const got = amount(rest);
+  if (!got) return { v: null };
+  const pct = line.match(/(\d{1,3})\s*%\s*$/);
+  const a = fixLostG('addedSugar', { ...got, pct: got.pct ?? (pct ? Number(pct[1]) : null) });
+  if (a.unit === '' && a.n > TYPICAL_BARE.addedSugar) return { v: null };
+  const v = toStored('addedSugar', a.n, a.unit);
+  return { v: v >= 0 && v <= SANE.addedSugar ? v : null };
+}
+
 /**
  * Read a Nutrition Facts label.
  * @param {string} text the recognized text, lines separated by newlines
@@ -227,7 +253,9 @@ export function parseNutritionLabel(text) {
       if (n != null && n <= SANE.kcal) per.kcal = n;
       continue;
     }
-    if (/^(includes|incl\.?)\s/.test(line) || /added\s*sugars?/.test(line.slice(0, 20)) || /^sugar\s*alcohol/.test(line)) continue; // "Includes 10g Added Sugars" is part of Total Sugars
+    const added = addedSugarRow(line, lines[i + 1]);
+    if (added) { if (per.addedSugar == null && added.v != null) per.addedSugar = added.v; continue; } // part of Total Sugars, its own key
+    if (/^(includes|incl\.?|incluye)\s/.test(line) || /added\s*sugars?/.test(line.slice(0, 20)) || /^sugar\s*alcohol/.test(line)) continue; // "Includes 2g Sugar Alcohol" etc.
     for (const [key, re] of ROWS) {
       const m = line.match(re);
       if (!m) continue;
@@ -242,6 +270,7 @@ export function parseNutritionLabel(text) {
       break;
     }
   }
-  const found = ['kcal', ...ROWS.map(([k]) => k)].filter((k) => per[k] != null);
+  if (per.addedSugar != null && per.sugar != null && per.addedSugar > per.sugar) delete per.addedSugar; // one of them is misread; leave added blank to check
+  const found = ['kcal', ...ROWS.map(([k]) => k), 'addedSugar'].filter((k) => per[k] != null);
   return { per, label, grams, found };
 }

@@ -42,7 +42,8 @@ const OFF_MAP = [
   ['carbohydrates_100g', 'carbs', 1],
   ['fat_100g', 'fat', 1],
   ['fiber_100g', 'fiber', 1],
-  ['sugars_100g', 'sugar', 1],
+  ['sugars_100g', 'sugar', 1], // total sugars
+  ['added-sugars_100g', 'addedSugar', 1],
   ['saturated-fat_100g', 'satFat', 1],
   ['trans-fat_100g', 'transFat', 1],
   ['cholesterol_100g', 'cholesterol', 1000],
@@ -55,12 +56,17 @@ const OFF_MAP = [
   ['vitamin-d_100g', 'vitD', 1e6],
 ];
 
+/** Read from the per-serving value when a product has no per-100 g one (US products are often entered per serving). */
+const OFF_PER_SERVING = [['sugars', 'sugar'], ['added-sugars', 'addedSugar']];
+
 /**
- * OFF nutriments -> per-100 g nutrients in our units. Returns null when there is no energy value.
+ * OFF nutriments -> per-100 g nutrients in our units. Returns null when there is no energy value. Added sugars stay
+ * null (not listed) unless the product gives them.
  * @param {Object} nm product.nutriments
+ * @param {number|null} [servingGrams] product.serving_quantity, for values given only per serving
  * @returns {Record<string, number|null>|null}
  */
-export function offNutrients(nm) {
+export function offNutrients(nm, servingGrams = null) {
   if (!nm || typeof nm !== 'object') return null;
   let kcal = num(nm['energy-kcal_100g']);
   if (kcal == null) {
@@ -74,6 +80,11 @@ export function offNutrients(nm) {
   for (const [src, key, mult] of OFF_MAP) {
     const v = num(nm[src]);
     if (v != null) out[key] = r3(v * mult);
+  }
+  const sq = num(servingGrams);
+  for (const [base, key] of OFF_PER_SERVING) {
+    const v = num(nm[`${base}_serving`]);
+    if (out[key] == null && v != null && sq != null && sq > 0) out[key] = r3((v * 100) / sq);
   }
   if (out.sodium == null) {
     const salt = num(nm['salt_100g']);
@@ -92,11 +103,11 @@ export function normalizeOFF(p) {
   const code = String(p.code || p._id || '').trim();
   const name = (textOf(p.product_name) || textOf(p.product_name_en) || textOf(p.generic_name)).replace(/\s+/g, ' ').trim();
   if (!code || !name) return null;
-  const per100g = offNutrients(p.nutriments);
+  const q = num(p.serving_quantity);
+  const per100g = offNutrients(p.nutriments, q);
   if (!per100g) return null;
   const brand = textOf(p.brands).split(',')[0].trim();
   const servings = [];
-  const q = num(p.serving_quantity);
   if (q != null && q > 0) {
     const label = textOf(p.serving_size).replace(/\s+/g, ' ').trim() || `${q} g`;
     servings.push({ label, grams: q });
@@ -108,12 +119,16 @@ export function normalizeOFF(p) {
 // ---------- USDA FoodData Central ----------
 
 /** Target [unit] for each key; FDC rows are converted from their own unitName. */
-const TARGET_UNIT = { kcal: 'kcal', protein: 'g', carbs: 'g', fat: 'g', fiber: 'g', sugar: 'g', satFat: 'g', transFat: 'g', cholesterol: 'mg', sodium: 'mg', potassium: 'mg', calcium: 'mg', iron: 'mg', vitA: 'ug', vitC: 'mg', vitD: 'ug' };
+const TARGET_UNIT = { kcal: 'kcal', protein: 'g', carbs: 'g', fat: 'g', fiber: 'g', sugar: 'g', addedSugar: 'g', satFat: 'g', transFat: 'g', cholesterol: 'mg', sodium: 'mg', potassium: 'mg', calcium: 'mg', iron: 'mg', vitA: 'ug', vitC: 'mg', vitD: 'ug' };
 
-/** FDC nutrient number (string, "208") / id -> our key. Order matters for fallbacks. */
+/**
+ * FDC nutrient number (string, "208") / id -> our key. The first row found for a key wins. Sugars: total is
+ * "Sugars, total including NLEA" (number 269, id 2000) or "Sugars, Total NLEA" (id 1063, number 269.3); added is
+ * "Sugars, added" (number 539, id 1235), checked against FDC's nutrient.csv.
+ */
 const FDC_IDS = {
   208: 'kcal', 1008: 'kcal', 203: 'protein', 1003: 'protein', 205: 'carbs', 1005: 'carbs', 204: 'fat', 1004: 'fat',
-  291: 'fiber', 1079: 'fiber', 269: 'sugar', 2000: 'sugar', 1063: 'sugar', 606: 'satFat', 1258: 'satFat', 605: 'transFat', 1257: 'transFat',
+  291: 'fiber', 1079: 'fiber', 269: 'sugar', 2000: 'sugar', 1063: 'sugar', 539: 'addedSugar', 1235: 'addedSugar', 606: 'satFat', 1258: 'satFat', 605: 'transFat', 1257: 'transFat',
   601: 'cholesterol', 1253: 'cholesterol', 307: 'sodium', 1093: 'sodium', 306: 'potassium', 1092: 'potassium', 301: 'calcium', 1087: 'calcium',
   303: 'iron', 1089: 'iron', 320: 'vitA', 1106: 'vitA', 401: 'vitC', 1162: 'vitC', 328: 'vitD', 1114: 'vitD',
 };

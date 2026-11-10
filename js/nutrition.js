@@ -2,7 +2,11 @@
 import { addDays, diffDays, ageFromBirthYear } from './dates.js';
 import { cleanLabel } from './units.js';
 
-export const NUTRIENTS = ['kcal', 'protein', 'carbs', 'fat', 'fiber', 'sugar', 'satFat', 'transFat', 'cholesterol', 'sodium', 'potassium', 'calcium', 'iron', 'vitA', 'vitC', 'vitD'];
+/**
+ * Nutrient keys. `sugar` is TOTAL sugars (every value stored before added sugars existed is a total); `addedSugar` is
+ * the "Includes Xg Added Sugars" part of it, null when the source doesn't list it (never assumed 0).
+ */
+export const NUTRIENTS = ['kcal', 'protein', 'carbs', 'fat', 'fiber', 'sugar', 'addedSugar', 'satFat', 'transFat', 'cholesterol', 'sodium', 'potassium', 'calcium', 'iron', 'vitA', 'vitC', 'vitD'];
 
 /** Display metadata per nutrient: label, unit, decimals shown. */
 export const NUTRIENT_INFO = {
@@ -11,7 +15,8 @@ export const NUTRIENT_INFO = {
   carbs: { label: 'Carbohydrates', unit: 'g', dp: 1 },
   fat: { label: 'Fat', unit: 'g', dp: 1 },
   fiber: { label: 'Fiber', unit: 'g', dp: 1 },
-  sugar: { label: 'Sugars', unit: 'g', dp: 1 },
+  sugar: { label: 'Total sugars', unit: 'g', dp: 1 },
+  addedSugar: { label: 'Added sugars', unit: 'g', dp: 1 },
   satFat: { label: 'Saturated fat', unit: 'g', dp: 1 },
   transFat: { label: 'Trans fat', unit: 'g', dp: 1 },
   cholesterol: { label: 'Cholesterol', unit: 'mg', dp: 0 },
@@ -59,7 +64,7 @@ export const DEFAULT_PROFILE = {
   startDate: null,
 };
 
-/** @returns {Record<string, number|null>} all 16 keys set to null */
+/** @returns {Record<string, number|null>} every nutrient key set to null */
 export function emptyNutrients() {
   const o = {};
   for (const k of NUTRIENTS) o[k] = null;
@@ -81,24 +86,27 @@ export function scaleNutrients(n, factor) {
 }
 
 /**
- * Sum nutrient objects. Unknown counts as 0 but is tracked per key.
+ * Sum nutrient objects. Unknown counts as 0 but is tracked per key: `unknown[k]` is true when any item lacked it, and
+ * `missing[k]` counts those items (out of `count`).
  * @param {Array<Object|null>} list
- * @returns {{total: Record<string, number>, unknown: Record<string, boolean>}}
+ * @returns {{total: Record<string, number>, unknown: Record<string, boolean>, missing: Record<string, number>, count: number}}
  */
 export function sumNutrients(list) {
   const total = {};
   const unknown = {};
+  const missing = {};
   for (const k of NUTRIENTS) {
     total[k] = 0;
     unknown[k] = false;
+    missing[k] = 0;
   }
   for (const n of list) {
     for (const k of NUTRIENTS) {
       if (n && isNum(n[k])) total[k] += n[k];
-      else unknown[k] = true;
+      else { unknown[k] = true; missing[k]++; }
     }
   }
-  return { total, unknown };
+  return { total, unknown, missing, count: list.length };
 }
 
 /**
@@ -211,7 +219,26 @@ export function calorieTarget(profile, kg, now = new Date()) {
 }
 
 /** Kinds: 'limit' (stay under: green under, red over), 'goal' (aim to reach: green once reached), null (informational). */
-const LIMIT_KEYS = new Set(['kcal', 'carbs', 'fat', 'satFat', 'sodium', 'cholesterol', 'sugar', 'transFat']);
+const LIMIT_KEYS = new Set(['kcal', 'carbs', 'fat', 'satFat', 'sodium', 'cholesterol', 'addedSugar', 'transFat']);
+/** Shown with a plain bar and never a target or limit color (total sugars: only the added part has a limit). */
+export const NO_TARGET_KEYS = new Set(['sugar']);
+/** FDA Daily Value for added sugars, g/day: the default added-sugars limit. */
+export const ADDED_SUGAR_DV = 50;
+
+/**
+ * Bring a stored profile up to date. Before added sugars existed, a "Sugars" target was a limit on all sugars; it now
+ * applies to added sugars (total sugars has no target). An added-sugars target already set wins. Pure; returns a new
+ * object when anything changed, else the same one.
+ * @param {Object} profile settings record (or its fields)
+ * @returns {Object}
+ */
+export function migrateProfile(profile) {
+  const nt = profile && profile.nutrientTargets;
+  if (!nt || typeof nt !== 'object' || !('sugar' in nt)) return profile;
+  const { sugar, ...rest } = nt;
+  if (!(isNum(rest.addedSugar) && rest.addedSugar > 0) && isNum(sugar) && sugar > 0) rest.addedSugar = sugar;
+  return { ...profile, nutrientTargets: rest };
+}
 
 /**
  * How a day's amount stands against its target: 'over' (a limit exceeded), 'under' (within a limit), 'met' (a goal
@@ -243,6 +270,7 @@ export function resolveTargets(profile, kcal) {
     fat: [macros.fat, 'limit'],
     fiber: [(14 * kcal) / 1000, 'goal'],
     sugar: [null, null],
+    addedSugar: [ADDED_SUGAR_DV, 'limit'],
     satFat: [(0.1 * kcal) / 9, 'limit'],
     transFat: [null, null],
     cholesterol: [300, 'limit'],
@@ -254,11 +282,11 @@ export function resolveTargets(profile, kcal) {
     vitC: [male ? 90 : 75, 'goal'],
     vitD: [15, 'goal'],
   };
-  const over = profile.nutrientTargets || {};
+  const over = migrateProfile(profile).nutrientTargets || {};
   const out = {};
   for (const k of NUTRIENTS) {
     let [value, kind] = base[k];
-    if (isNum(over[k]) && over[k] > 0) {
+    if (isNum(over[k]) && over[k] > 0 && !NO_TARGET_KEYS.has(k)) {
       value = over[k];
       kind = LIMIT_KEYS.has(k) ? 'limit' : 'goal';
     }
@@ -366,6 +394,8 @@ export function recipeNutrition(recipe) {
   const per = scaleNutrients(total, 1 / servings);
   const cooked = isNum(recipe.cookedGrams) && recipe.cookedGrams > 0 ? recipe.cookedGrams : null;
   const per100g = cooked ? scaleNutrients(total, 100 / cooked) : null;
+  // Added sugars stay "not listed" unless every ingredient lists them: a partial sum would be logged as a known amount.
+  if (unknown.addedSugar) { per.addedSugar = null; if (per100g) per100g.addedSugar = null; }
   return { total, unknown, servings, perServing: per, per100g, gramsPerServing: cooked ? cooked / servings : null };
 }
 

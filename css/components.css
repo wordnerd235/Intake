@@ -105,6 +105,7 @@ input[type="date"].input { min-width: 0; }
 .bar.thin .bar-text { position: relative; display: block; height: auto; padding: 0 8px; font-size: 12px; line-height: 20px; white-space: nowrap; background: none; border-radius: 0; }
 .is-over .bar.thin > span:first-child { background: var(--over-soft); border-color: var(--over); }
 .is-met .bar.thin > span:first-child { background: var(--good-soft); border-color: var(--good); }
+.bar.thin.plain > span:first-child { background: var(--line); border-color: var(--muted); } /* total sugars: no target, no color */
 .bar-text { color: var(--muted); font-size: 12px; }
 .is-over .bar-text { color: var(--over-ink); font-weight: 650; }
 .is-met .bar-text { color: var(--good-ink); font-weight: 650; }
@@ -116,6 +117,7 @@ input[type="date"].input { min-width: 0; }
 .r { text-align: right; }
 .is-over .nval { color: var(--over-ink); font-weight: 700; }
 .ntgt { color: var(--muted); }
+.nnote { grid-column: 1 / -1; line-height: 1.35; }
 @media (max-width: 559px) {
   .nrow { grid-template-columns: minmax(0, 1fr) 96px 64px; }
   .npct { grid-column: 1 / -1; }
@@ -131,6 +133,8 @@ input[type="date"].input { min-width: 0; }
 .fact:first-of-type { border-top: 0; }
 .fact.main .fact-name { font-weight: 650; }
 .fact.sub { padding-left: 16px; color: var(--muted); }
+.fact.sub2 { padding-left: 32px; }
+.fact-val.not-listed { font-weight: 400; font-style: italic; color: var(--muted); }
 .fact-val { font-weight: 550; white-space: nowrap; }
 .facts-rule { height: 4px; background: var(--ink); margin: 4px 0 2px; border-radius: 1px; }
 .facts-host { margin-top: 4px; }

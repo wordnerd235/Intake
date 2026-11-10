@@ -23,8 +23,8 @@ test('parseEstimate: a normal answer, fenced JSON, junk rows dropped, a blocked 
   const answer = { items: [{ name: 'Grilled chicken thigh', search: 'chicken thigh roasted', grams: 140.4, kcal: 290, protein: 34, carbs: 0, fat: 16 }, { name: '', grams: 50, kcal: 10 }, { name: 'Air', grams: 0, kcal: 0 }, { name: 'Rice', grams: '180 g', kcal: '234', protein: 4 }], note: 'Assumed  cooked in a little oil.' };
   const r = parseEstimate({ candidates: [{ content: { parts: [{ text: JSON.stringify(answer) }] } }] });
   assert.deepEqual(r.items, [
-    { name: 'Grilled chicken thigh', search: 'chicken thigh roasted', grams: 140, kcal: 290, protein: 34, carbs: 0, fat: 16 },
-    { name: 'Rice', search: 'Rice', grams: 180, kcal: 234, protein: 4, carbs: null, fat: null },
+    { name: 'Grilled chicken thigh', search: 'chicken thigh roasted', grams: 140, kcal: 290, protein: 34, carbs: 0, fat: 16, sugar: null, addedSugar: null },
+    { name: 'Rice', search: 'Rice', grams: 180, kcal: 234, protein: 4, carbs: null, fat: null, sugar: null, addedSugar: null },
   ]);
   assert.equal(r.note, 'Assumed cooked in a little oil.');
   assert.equal(parseEstimate('```json\n{"items":[{"name":"Banana","search":"banana raw","grams":118,"kcal":105,"protein":1,"carbs":27,"fat":0}],"note":""}\n```').items[0].name, 'Banana');

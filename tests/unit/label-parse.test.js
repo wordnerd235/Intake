@@ -1,4 +1,4 @@
-// Nutrition Facts label parsing: clean text, typical OCR noise, and the traps (Added Sugars, % DV numbers, lost "g").
+// Nutrition Facts label parsing: clean text, typical OCR noise, and the traps (Added Sugars kept apart from Total Sugars, % DV numbers, lost "g").
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseNutritionLabel, cleanLine } from '../../js/label-parse.js';
@@ -24,9 +24,9 @@ Calcium 260mg 20%
 Iron 8mg 45%
 Potassium 240mg 6%`;
 
-test('a clean label: every row, the serving, and Added Sugars ignored', () => {
+test('a clean label: every row, the serving, and Added Sugars read apart from Total Sugars', () => {
   const r = parseNutritionLabel(CLEAN);
-  assert.deepEqual(r.per, { kcal: 230, fat: 8, satFat: 1, transFat: 0, cholesterol: 0, sodium: 160, carbs: 37, fiber: 4, sugar: 12, protein: 3, vitD: 2, calcium: 260, iron: 8, potassium: 240 });
+  assert.deepEqual(r.per, { kcal: 230, fat: 8, satFat: 1, transFat: 0, cholesterol: 0, sodium: 160, carbs: 37, fiber: 4, sugar: 12, addedSugar: 10, protein: 3, vitD: 2, calcium: 260, iron: 8, potassium: 240 });
   assert.equal(r.label, '2/3 cup');
   assert.equal(r.grams, 55);
   assert.equal(r.found[0], 'kcal');
@@ -58,7 +58,7 @@ Protein 9g`;
 
 test('real OCR output of a rendered label (Tesseract 5, straight and tilted 3 degrees)', () => {
   const straight = `Nutrition Facts\n8 servings per container\nServing size 2/3 cup (559)\nLe rrr)\nMm pera\nCalories 230\n% Daily Value*\nTotal Fat 8g 10%\nSaturated Fat 1g 5%\nTrans Fat Og\nCholesterol Omg 0%\nSodium 160mg 7%\nTotal Carbohydrate 37g 13%\nDietary Fiber 49 14%\nTotal Sugars 129\nIncludes 10g Added Sugars 20%\nProtein 3g\nVitamin D 2meg 10%\nCalcium 260mg 20%\nIron 8mg 45%\nPotassium 240mg 6%`;
-  const want = { kcal: 230, fat: 8, satFat: 1, transFat: 0, cholesterol: 0, sodium: 160, carbs: 37, fiber: 4, sugar: 12, protein: 3, vitD: 2, calcium: 260, iron: 8, potassium: 240 };
+  const want = { kcal: 230, fat: 8, satFat: 1, transFat: 0, cholesterol: 0, sodium: 160, carbs: 37, fiber: 4, sugar: 12, addedSugar: 10, protein: 3, vitD: 2, calcium: 260, iron: 8, potassium: 240 };
   const a = parseNutritionLabel(straight);
   assert.deepEqual(a.per, want);
   assert.equal(a.grams, 55, '"(559)" is 55 g');
@@ -121,7 +121,7 @@ test('real phone photos (PaddleOCR output): two nutrients per line, glued words,
 
 test('a bilingual label (English/Spanish), with a stray word from the jar beside it', () => {
   const r = parseNutritionLabel('Serving size/Tamano por racion 1 cup/1 taza (37g)\nCalories/Calorias 140 210\nTTER Total Fat/Grasa Total 2g* Saturated Fat/Grasa Saturada 0g 0% 3%\nCholesterol/Colesterol Omg 0% 1%\nTotal Carbohydrate/Carbohidrato Total 30g 11% 14%\nIncl.Added Sugars/ncluye azucares anadidos 12g24% 24%\nIron/Hierro 3.6mg 20% 20%');
-  assert.deepEqual(r.per, { kcal: 140, fat: 2, satFat: 0, cholesterol: 0, carbs: 30, iron: 3.6 });
+  assert.deepEqual(r.per, { kcal: 140, fat: 2, satFat: 0, cholesterol: 0, carbs: 30, addedSugar: 12, iron: 3.6 }, '"12g 24%" agrees with the 50 g Daily Value');
   assert.equal(r.label, '1 cup');
   assert.equal(r.grams, 37);
 });

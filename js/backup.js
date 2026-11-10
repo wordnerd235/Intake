@@ -70,14 +70,17 @@ export function toCsv(rows) {
 
 const round = (n, dp = 1) => (Number.isFinite(n) ? Math.round(n * 10 ** dp) / 10 ** dp : '');
 
+/** CSV column names that differ from the stored key (`sugar` has always held total sugars). */
+const CSV_NAME = { sugar: 'totalSugar' };
+
 /**
- * Food log CSV: one row per entry with totals for all 16 nutrients.
+ * Food log CSV: one row per entry with totals for every nutrient (blank = not listed).
  * @param {Object[]} logs foodLogs (live)
  * @param {string[]} mealNames
  * @returns {string}
  */
 export function foodLogCsv(logs, mealNames) {
-  const head = ['date', 'meal', 'food', 'brand', 'amount', 'unit', ...NUTRIENTS];
+  const head = ['date', 'meal', 'food', 'brand', 'amount', 'unit', ...NUTRIENTS.map((k) => CSV_NAME[k] || k)];
   const rows = [head];
   const sorted = logs.slice().sort((a, b) => (a.date === b.date ? (a.meal - b.meal) || (a.createdAt - b.createdAt) : a.date < b.date ? -1 : 1));
   for (const e of sorted) {

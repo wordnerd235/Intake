@@ -1,6 +1,6 @@
 // normalize.js - PURE: Open Food Facts / USDA FoodData Central JSON -> internal Food shape.
 // Units are the whole point: OFF stores minerals/vitamins in GRAMS per 100 g, FDC mixes MG/UG/G/IU/kJ.
-import { NUTRIENTS } from './nutrition.js';
+import { NUTRIENTS, impossibleAddedSugar } from './nutrition.js';
 
 const num = (v) => {
   if (v == null || v === '') return null;
@@ -90,6 +90,7 @@ export function offNutrients(nm, servingGrams = null) {
     const salt = num(nm['salt_100g']);
     if (salt != null) out.sodium = r3((salt / 2.5) * 1000); // salt (g) -> sodium (mg)
   }
+  if (impossibleAddedSugar(out)) out.addedSugar = null; // more added than total: the entry is wrong somewhere
   return out;
 }
 
@@ -187,6 +188,7 @@ export function fdcNutrients(rows) {
   out.kcal = r3(out.kcal);
   if (out.vitA == null && vitAIu != null) out.vitA = r3(vitAIu * 0.3); // IU retinol -> µg RAE
   if (out.vitD == null && vitDIu != null) out.vitD = r3(vitDIu * 0.025); // IU -> µg
+  if (impossibleAddedSugar(out)) out.addedSugar = null; // more added than total: the entry is wrong somewhere
   return out;
 }
 

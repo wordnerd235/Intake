@@ -175,3 +175,46 @@ test('looking a saved product up again: Open Food Facts by barcode, USDA by id (
   assert.equal(await fetchSavedFood('custom:abc', ''), null, 'not a product: nothing to fetch');
   await assert.rejects(() => foodFDC(1, '', { fetchFn: fakeFetch({ 'food/1': [429, {}] }).fn }), (e) => e.kind === 'rate');
 });
+
+// ---------- order, and impossible numbers (Caleb's backup, 2026-11-10) ----------
+
+test('most recently used first: what you log every day is done within seconds of opening', () => {
+  const m = (id, lastUsed) => ({ id, lastUsed, food: { key: id, per100g: { kcal: 1, sugar: 1 } } });
+  const metas = [m('fdc:100', 10), m('off:0016000169685', 20), m('off:4069365630655', 99), { id: 'off:777777', favorite: true, food: { key: 'off:777777', per100g: { kcal: 1 } } }];
+  assert.deepEqual(pendingKeys(metas, []), ['off:4069365630655', 'off:0016000169685', 'fdc:100', 'off:777777'], 'by last use, not by barcode; never-logged favorites last');
+});
+
+test('added sugars above total sugars are refused when read from Open Food Facts or USDA', async () => {
+  const { offNutrients, fdcNutrients } = await import('../../js/normalize.js');
+  const coffeeMate = offNutrients({ 'energy-kcal_100g': 400, sugars_100g: 0, 'added-sugars_100g': 56.95 });
+  assert.equal(coffeeMate.sugar, 0);
+  assert.equal(coffeeMate.addedSugar, null, '56.95 g added in 0 g total: not listed rather than wrong');
+  assert.equal(offNutrients({ 'energy-kcal_100g': 100, sugars_100g: 4, 'added-sugars_100g': 4.2 }).addedSugar, 4.2, 'rounding apart: kept');
+  assert.equal(offNutrients({ 'energy-kcal_100g': 100, 'added-sugars_100g': 3 }).addedSugar, 3, 'no total to compare: kept');
+  assert.equal(fdcNutrients([{ nutrientId: 1008, unitName: 'KCAL', value: 10 }, { nutrientId: 2000, unitName: 'G', value: 5 }, { nutrientId: 1235, unitName: 'G', value: 9 }]).addedSugar, null);
+});
+
+test('the store never saves added sugars above total sugars, whatever the route', async () => {
+  const s = mk();
+  const e = await s.addLog({ date: '2026-11-10', meal: 0, foodKey: 'off:0050000303021', name: 'Coffee mate', serving: { label: '1 tbsp', grams: 15 }, qty: 1, per: { kcal: 60, sugar: 0, addedSugar: 8.5 } });
+  assert.equal(e.per.addedSugar, null);
+  const ok = await s.addLog({ date: '2026-11-10', meal: 0, foodKey: 'quick', name: 'Soda', serving: { label: '1 can', grams: 355 }, qty: 1, per: { kcal: 140, sugar: 39, addedSugar: 39 } });
+  assert.equal(ok.per.addedSugar, 39);
+});
+
+test('a saved copy already holding an impossible number is looked up once more, even if checked before', async () => {
+  const s = mk();
+  const bad = { key: 'off:0050000303021', name: 'Coffee mate', brand: 'Nestle', source: 'off', per100g: { kcal: 400, sugar: 0, addedSugar: 56.95 }, servings: [{ label: '15 g', grams: 15 }] };
+  await s.adapter.put('foodMeta', { id: bad.key, favorite: false, useCount: 3, lastUsed: 5, lastServing: null, food: bad, updatedAt: 5, deleted: false });
+  await s.setMeta(REFRESH_META_KEY, { checked: [bad.key] }); // the first run had looked it up already
+  const fresh = { ...bad, per100g: { kcal: 400, sugar: 0, addedSugar: null } }; // today's reader refuses the number
+  let asked = 0;
+  const r = await refreshSavedFoods({ store: s, fetchFood: async () => { asked++; return fresh; }, wait: noWait });
+  assert.equal(asked, 1);
+  assert.equal(r.pending, 0);
+  const m = await s.getFoodMeta(bad.key);
+  assert.equal(m.food.per100g.addedSugar, null, 'now "not listed"');
+  assert.equal(m.useCount, 3);
+  await refreshSavedFoods({ store: s, fetchFood: async () => { asked++; return fresh; }, wait: noWait });
+  assert.equal(asked, 1, 'not asked again');
+});

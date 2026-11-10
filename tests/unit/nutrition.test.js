@@ -77,7 +77,10 @@ test('default nutrient targets', () => {
   assert.equal(t.vitA.value, 900);
   assert.equal(t.vitC.value, 90);
   assert.equal(t.vitD.value, 15);
-  assert.equal(t.sugar.kind, null);
+  assert.equal(t.sugar.kind, null, 'total sugars: no target');
+  assert.equal(t.sugar.value, null);
+  assert.equal(t.addedSugar.value, 50, 'added sugars: FDA Daily Value');
+  assert.equal(t.addedSugar.kind, 'limit');
   for (const k of ['kcal', 'carbs', 'fat']) assert.equal(t[k].kind, 'limit', `${k} is a stay-under target`);
   assert.equal(t.protein.kind, 'goal');
   const f = N.resolveTargets({ ...male, sex: 'female' }, 1800);
@@ -85,10 +88,13 @@ test('default nutrient targets', () => {
   assert.equal(f.iron.value, 18);
   assert.equal(f.vitA.value, 700);
   assert.equal(f.vitC.value, 75);
-  const o = N.resolveTargets({ ...male, nutrientTargets: { sodium: 1500, sugar: 50 } }, 2000);
+  const o = N.resolveTargets({ ...male, nutrientTargets: { sodium: 1500, addedSugar: 36 } }, 2000);
   assert.equal(o.sodium.value, 1500);
-  assert.equal(o.sugar.value, 50);
-  assert.equal(o.sugar.kind, 'limit');
+  assert.equal(o.addedSugar.value, 36);
+  assert.equal(o.addedSugar.kind, 'limit');
+  const old = N.resolveTargets({ ...male, nutrientTargets: { sugar: 40 } }, 2000);
+  assert.deepEqual(old.sugar, { value: null, kind: null }, 'an old Sugars limit no longer applies to total sugars');
+  assert.deepEqual(old.addedSugar, { value: 40, kind: 'limit' }, '...it moves to added sugars');
 });
 
 test('targetStatus: limits are green under and red over; goals are green once reached', () => {

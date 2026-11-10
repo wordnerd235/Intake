@@ -38,6 +38,7 @@ export function openFoodEditor(o = {}) {
       per[k] = v;
     }
     if (per.kcal == null) { err.textContent = 'Calories are required (use 0 if there are none).'; nums.kcal.input.focus(); return; }
+    if (per.addedSugar != null && per.sugar != null && per.addedSugar > per.sugar + 1e-9) { err.textContent = "Added sugars can't be more than total sugars (they're part of it)."; nums.addedSugar.input.focus(); return; }
     if (grams.raw().trim() && grams.get() == null) { err.textContent = grams.problem() || 'Serving weight must be a number of grams.'; grams.input.focus(); return; }
     try {
       const rec = await store.saveCustomFood({ ...(f ? { id: f.id } : {}), ...buildCustomFood({ name: name.value, brand: brand.value, label: label.value, grams: grams.get(), per, barcode }) });
@@ -56,7 +57,8 @@ export function openFoodEditor(o = {}) {
     if (o.onDeleted) o.onDeleted();
   }, { variant: 'ghost', cls: 'danger-text', ic: 'trash' }) : null;
 
-  const grid = (keys) => h('div', { class: 'grid-fields' }, keys.map((k) => field(`${NUTRIENT_INFO[k].label}${k === 'kcal' ? ' *' : ''}`, nums[k].el)));
+  const HINT = { addedSugar: "Part of total sugars. Leave empty if the label doesn't list it." };
+  const grid = (keys) => h('div', { class: 'grid-fields' }, keys.map((k) => field(`${NUTRIENT_INFO[k].label}${k === 'kcal' ? ' *' : ''}`, nums[k].el, HINT[k])));
   const s = sheet({
     title: o.title || (f ? 'Edit food' : 'Create food'), size: 'md',
     content: [

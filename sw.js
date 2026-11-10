@@ -3,7 +3,7 @@
 // Strategy: the app shell is precached in a versioned cache and served cache-first (so every page load is internally
 // consistent); data/foods.json is cached separately and refreshed in the background; CDN scripts for sync / barcode
 // scanning are runtime-cached. API calls (Firebase, Open Food Facts, USDA) are never touched by this worker.
-const CACHE_VERSION = 'a15872b6';
+const CACHE_VERSION = '7d1060f6';
 const SHELL = `intake-v${CACHE_VERSION}`;
 const DATA = 'intake-data';
 const CDN = 'intake-cdn';
@@ -44,6 +44,7 @@ const PRECACHE = [
   './js/main.js',
   './js/meal-photo-core.js',
   './js/normalize.js',
+  './js/nutrient-rows.js',
   './js/nutrition.js',
   './js/online-foods.js',
   './js/overlay.js',

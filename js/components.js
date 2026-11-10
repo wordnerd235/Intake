@@ -69,5 +69,5 @@ export function notice(text, kind = 'info', action = null) {
  * @param {{date:string, total:Object, unknown:Object, targets:Object}} d a loaded day
  */
 export function openNutrientsSheet(d) {
-  sheet({ title: `Nutrients · ${formatDate(d.date, today())}`, size: 'md', content: [nutrientsTable(d.total, d.unknown, d.targets)] });
+  sheet({ title: `Nutrients · ${formatDate(d.date, today())}`, size: 'md', content: [nutrientsTable(d.total, d.unknown, d.targets, d)] });
 }

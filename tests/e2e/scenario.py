@@ -6,6 +6,7 @@ from pathlib import Path
 from playwright.sync_api import expect
 
 from helpers import FAKE_CAMERA, FAKE_OCR, NO_CAMERA, SHOTS, TINY_PNG, Net, clean_text, num, overflow, small_targets
+from sugars import added_sugars
 
 BANANA_KCAL = 105
 
@@ -242,7 +243,7 @@ class Scenario:
         self.shot("label-camera")
         expect(p.locator(".sheet-title").last).to_have_text("Check the scanned label", timeout=15000)
         expect(p.locator(".fe-note")).to_contain_text("check each number")
-        for sel, want in (("#fe-kcal", "230"), ("#fe-fat", "8"), ("#fe-satFat", "1"), ("#fe-sodium", "160"), ("#fe-carbs", "37"), ("#fe-fiber", "4"), ("#fe-sugar", "12"), ("#fe-protein", "3"), ("#fe-label", "2/3 cup"), ("#fe-grams", "55")):
+        for sel, want in (("#fe-kcal", "230"), ("#fe-fat", "8"), ("#fe-satFat", "1"), ("#fe-sodium", "160"), ("#fe-carbs", "37"), ("#fe-fiber", "4"), ("#fe-sugar", "12"), ("#fe-addedSugar", "10"), ("#fe-protein", "3"), ("#fe-label", "2/3 cup"), ("#fe-grams", "55")):
             expect(p.locator(sel)).to_have_value(want)
         clean_text(p, "scanned label editor")
         p.fill("#fe-name", "Scanned granola")
@@ -1058,6 +1059,7 @@ class Scenario:
             ("copy whole day (+Undo)", self.copy_whole_day), ("copy one entry to another day (+Undo)", self.copy_one_entry), ("amount limits", self.amount_limits), ("number fields have ceilings and say which", self.number_caps),
             ("copy day into a filled day: add or replace", self.copy_day_into_filled_day), ("thousands separator: 1,200 is 1200", self.thousands_separator), ("toast clears the Add button", self.toast_clears_add_button), ("toasts: low with a sheet, auto-dismiss, cleared on navigation", self.toasts_behave),
             ("compact totals are plain, Nutrients table has the legend", self.compact_totals_are_plain),
+            ("total and added sugars: entered, not listed, noted, limit colors", lambda: added_sugars(self)),
             ("online search + barcode entry (mocked)", self.online_search_and_barcode), ("Progress charts with data", lambda: (self.seed_history(), self.progress())),
             ("foods, more, account, diary screens", self.other_screens), ("units and calorie override", self.settings_flow),
             ("reload persists", self.reload_persists), ("export JSON, restore in a fresh browser", self.export_then_import),

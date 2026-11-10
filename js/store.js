@@ -2,7 +2,7 @@
 // createStore() builds an isolated instance (tests make one per "device"); `store` is the app singleton.
 import { bus as defaultBus } from './bus.js';
 import { COLLECTIONS, shouldApplyRemote, fromRemote } from './sync-core.js';
-import { NUTRIENTS, DEFAULT_PROFILE } from './nutrition.js';
+import { NUTRIENTS, DEFAULT_PROFILE, migrateProfile } from './nutrition.js';
 import { buildBackup, parseBackup } from './backup.js';
 import { createFoodStore } from './store-foods.js';
 
@@ -26,7 +26,7 @@ export const clean = (r) => {
   return rest;
 };
 
-/** Keep only the 16 known nutrient keys; anything non-finite becomes null. */
+/** Keep only the known nutrient keys; anything non-finite or missing becomes null (unknown). */
 export function sanitizeNutrients(n) {
   const o = {};
   for (const k of NUTRIENTS) o[k] = n && typeof n[k] === 'number' && Number.isFinite(n[k]) ? n[k] : null;
@@ -85,7 +85,8 @@ export function createStore({ adapter, bus = defaultBus, clock = Date.now, uuid:
     // ---- settings ----
     async getSettings() {
       const r = (await adapter.get('settings', 'profile')) || {};
-      const { id, updatedAt, deleted, _dirty, ...rest } = r;
+      // migrateProfile: an old "Sugars" limit (from this device, a backup or another device) now means added sugars
+      const { id, updatedAt, deleted, _dirty, ...rest } = migrateProfile(r);
       return {
         ...DEFAULT_PROFILE,
         ...rest,

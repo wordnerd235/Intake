@@ -168,6 +168,10 @@ Each food lists the portions USDA publishes (for example "1 medium", "1 cup", "1
 
 Numbers you type accept `1.5`, `1,5` (decimal comma), `1/2`, `1 1/2` and thousands separators: `1,200` is 1200 and `1,234,567` is 1234567. A comma that could mean either (`1,2345`) is refused with a message instead of guessed. In search, baby foods are listed only when you search for one ("baby", "babyfood", "infant"), and a short finished word such as "oat" does not match "oatmeal" when it is followed by another word. `tests/unit/default-serving.test.js` checks about forty everyday foods against the real data.
 
+## Total sugars and added sugars
+
+Foods carry two sugar numbers, as on a US label ("Total Sugars 12g / Includes 8g Added Sugars"). Added sugars have a daily limit of 50 g (the FDA Daily Value; change it under More, then Nutrient targets) and turn green or red in the Nutrients table. Total sugars get a plain bar with no limit. Many foods don't list added sugars: the built-in USDA list has none, and neither did any food logged before this change, since the old "Sugars" number was always the total. Those foods show "not listed", are left out of the day's added-sugar total, and the table says how many foods were missing, so the limit doesn't turn green on an incomplete total. If you had set a Sugars target before, it now applies to added sugars.
+
 ## Data sources and attribution
 
 - Foods: USDA FoodData Central, SR Legacy (the USDA National Nutrient Database for Standard Reference, April 2018). A work of the US government, public domain (CC0). Citation: U.S. Department of Agriculture, Agricultural Research Service. FoodData Central. https://fdc.nal.usda.gov. Details of how `data/foods.json` was built are in `data/DATA_NOTES.md`.

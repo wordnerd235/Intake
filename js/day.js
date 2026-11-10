@@ -22,7 +22,7 @@ export async function loadDay(date) {
   const eaten = Math.round(sum.total.kcal);
   const budget = dayBudget(tgt.target, exKcal, eaten, settings.addExerciseCalories);
   return {
-    date, settings, logs, exercise, water, note, weights, kg, tgt, total: sum.total, unknown: sum.unknown, byMeal, exKcal, eaten, budget,
+    date, settings, logs, exercise, water, note, weights, kg, tgt, total: sum.total, unknown: sum.unknown, missing: sum.missing, count: sum.count, byMeal, exKcal, eaten, budget,
     targets: resolveTargets(settings, tgt.target),
   };
 }

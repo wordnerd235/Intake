@@ -64,6 +64,16 @@ export const DEFAULT_PROFILE = {
   startDate: null,
 };
 
+/**
+ * Added sugars can't be more than total sugars (they are part of it). True when a source says otherwise by more than
+ * rounding (0.5 g, or 5% of the total): one of the two numbers is wrong, so added sugars are treated as not listed.
+ * @param {{sugar?:number|null, addedSugar?:number|null}|null|undefined} n
+ * @returns {boolean}
+ */
+export function impossibleAddedSugar(n) {
+  return !!n && isNum(n.addedSugar) && isNum(n.sugar) && n.addedSugar > n.sugar + Math.max(0.5, 0.05 * n.sugar);
+}
+
 /** @returns {Record<string, number|null>} every nutrient key set to null */
 export function emptyNutrients() {
   const o = {};

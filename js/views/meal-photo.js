@@ -20,6 +20,8 @@ export async function openMealPhoto({ date, meal, onDone }) {
   let m = meal;
   let ctl = null;
   const body = h('div', { class: 'mp' });
+  /** Replace the sheet's content; optional parts passed as null are skipped (replaceChildren would print "null"). */
+  const show = (...parts) => body.replaceChildren(...parts.filter(Boolean));
   const s = sheet({ title: 'Estimate a meal from a photo', size: 'md', content: body, onClose: () => { if (ctl) ctl.abort(); } });
   const pick = h('input', { type: 'file', accept: 'image/*', id: 'mp-file', hidden: true });
   pick.addEventListener('change', () => { const f = pick.files && pick.files[0]; pick.value = ''; if (f) estimate(f); });
@@ -37,7 +39,7 @@ export async function openMealPhoto({ date, meal, onDone }) {
       start();
     };
     keyIn.addEventListener('keydown', (e) => e.key === 'Enter' && save());
-    body.replaceChildren(
+    show(
       h('p', null, 'Gemini, Google\'s AI, looks at the photo and lists each food with an estimated amount. You check the amounts, then log them all at once.'),
       h('p', { class: 'muted small' }, 'It needs your own Google API key, saved only on this device. The photo is sent to Google; on the free tier Google may use it to improve its products. ', h('a', { href: 'https://aistudio.google.com/apikey', target: '_blank', rel: 'noopener noreferrer', class: 'link' }, 'Get a free key'), '.'),
       field('Google Gemini API key', keyIn), err,
@@ -47,7 +49,7 @@ export async function openMealPhoto({ date, meal, onDone }) {
   }
 
   function start(message) {
-    body.replaceChildren(
+    show(
       message ? notice(message, 'warn') : null,
       h('p', null, 'Take a photo of the food, or choose one. Get the whole plate in, from a little above, with the fork or a hand nearby for scale.'),
       pick,
@@ -58,7 +60,7 @@ export async function openMealPhoto({ date, meal, onDone }) {
   async function estimate(file) {
     const url = URL.createObjectURL(file);
     const status = h('span', null, ' Asking Gemini what\'s on the plate…');
-    body.replaceChildren(h('img', { class: 'mp-photo', src: url, alt: 'Your photo' }), h('p', { class: 'muted', role: 'status' }, spinner('Estimating'), status), pick);
+    show(h('img', { class: 'mp-photo', src: url, alt: 'Your photo' }), h('p', { class: 'muted', role: 'status' }, spinner('Estimating'), status), pick);
     s.showFooter(null);
     ctl = new AbortController();
     let r;
@@ -119,7 +121,7 @@ export async function openMealPhoto({ date, meal, onDone }) {
       toast(`Added ${ids.length} ${ids.length === 1 ? 'item' : 'items'} to ${mealLabel(settings, m)}`, { action: 'Undo', onAction: async () => { for (const id of ids) await store.deleteLog(id); } });
       if (onDone) onDone();
     }
-    body.replaceChildren(
+    show(
       h('img', { class: 'mp-photo', src: url, alt: 'Your photo' }),
       note ? notice(`Gemini: ${note}`, 'info') : null,
       h('p', { class: 'muted small' }, 'These are estimates from a photo. Check each amount (a kitchen scale beats any photo), then add.'),

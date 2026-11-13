@@ -41,6 +41,7 @@ js/
   label-frame.js         PURE live-camera frame checks: steady, in focus, detector sees a whole label at readable size; wholeLabel() for auto reads
   ppocr.js               PaddleOCR on ONNX Runtime Web 1.30 (lazy from unpkg): PP-OCRv5 mobile detector + PP-OCRv4 English recognizer
   ppocr-core.js          PURE PP-OCR post-processing: DB boxes from the probability map, straightened crops, CTC decode, line rebuild
+  chat-paste.js          PURE Quick add from a chat: the prompt for Claude (PROMPT), "Label: value" parsing via parseAmount (ranges, % DV, kJ/IU, limits named; "unknown" stays null; added > total dropped), one Quick add entry per food; views/chat-paste.js reviews and adds them with Undo
   food-refresh.js        PURE (store + fetch passed in): once, look commercial products saved without added sugars up again (Recents/Favorites copy replaced; recipe ingredients gain added sugars only when total sugars match); scans/searches also refresh used products' saved copies
   meal-photo-core.js     PURE meal photo estimate: Gemini request/schema, answer parsing, USDA match (kcal within max(25, 20%)), diary entries, error text
   gemini.js              Gemini generateContent call (the person's own key, x-goog-api-key; gemini-3.8-flash then Flash-Lite), 30 s on Flash before Flash-Lite, photo shrunk to 1024 px JPEG, thinkingLevel low (dropped if refused)

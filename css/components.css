@@ -261,3 +261,4 @@ html.has-overlay .toasts { left: 0; bottom: calc(env(safe-area-inset-bottom) + 8
 .mp-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .mp-amt { width: 104px; flex: none; }
 .mp-total { font-weight: 600; margin: 8px 0 12px; }
+.cp-prompt-text { margin: 8px 0; padding: 10px 12px; max-height: 240px; overflow: auto; background: var(--sunk); border: 1px solid var(--line); border-radius: var(--r-sm); font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }

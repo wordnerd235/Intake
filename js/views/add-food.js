@@ -13,6 +13,7 @@ import { openFoodEditor } from './food-editor.js';
 import { openBarcodeSheet } from '../barcode.js';
 import { scanLabel } from '../label-scan.js';
 import { openMealPhoto } from './meal-photo.js';
+import { openChatPaste } from './chat-paste.js';
 import { fmtInt, shortLabel, formatQty, cleanLabel, LIMITS } from '../units.js';
 import { today } from '../dates.js';
 
@@ -38,7 +39,7 @@ function defaultPick(food, meta) {
   return { serving: opts[0] || { label: '1 serving', grams: null, per: {} }, qty: 1 };
 }
 
-/** Quick Add sheet: a name and calories (+ optional P/C/F). */
+/** Quick Add sheet: a name and calories (+ optional P/C/F), or nutrition pasted from a Claude chat (chat-paste.js). */
 export async function openQuickAdd({ date, meal, onDone }) {
   const settings = await store.getSettings();
   let m = meal;
@@ -62,7 +63,8 @@ export async function openQuickAdd({ date, meal, onDone }) {
   kcal.input.addEventListener('keydown', (e) => e.key === 'Enter' && save());
   const s = sheet({
     title: 'Quick add', size: 'sm',
-    content: [field('Name (optional)', name), field('Calories *', kcal.el), h('div', { class: 'three-up' }, field('Protein', p.el), field('Carbs', c.el), field('Fat', f.el)), field('Meal', mealSel), err],
+    content: [h('div', { class: 'btn-row left' }, button('Paste from a Claude chat', () => { s.close(); openChatPaste({ date, meal: m, onDone }); }, { variant: 'secondary', ic: 'copy' })),
+      field('Name (optional)', name), field('Calories *', kcal.el), h('div', { class: 'three-up' }, field('Protein', p.el), field('Carbs', c.el), field('Fat', f.el)), field('Meal', mealSel), err],
     footer: h('div', { class: 'btn-row' }, button(`Add`, save, { variant: 'primary', cls: 'grow' })),
   });
   return s;

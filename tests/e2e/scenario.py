@@ -7,6 +7,7 @@ from playwright.sync_api import expect
 
 from helpers import FAKE_CAMERA, FAKE_OCR, NO_CAMERA, SHOTS, TINY_PNG, Net, clean_text, num, overflow, small_targets
 from sugars import added_sugars, saved_foods_refresh
+from chat_paste import chat_paste
 
 BANANA_KCAL = 105
 
@@ -312,6 +313,7 @@ class Scenario:
         expect(p.locator(".sheet .field-error").last).to_contain_text("part of a key")
         p.fill("#mp-key", "AQ.Ab8RN6" + "x" * 30)
         p.get_by_role("button", name="Save key").click()
+        expect(p.locator(".sheet .mp")).to_contain_text("Take a photo of the food")  # the start screen, not the key screen
         clean_text(p, "meal photo start")
         # Google says no: the reason is shown, and another photo can be tried
         p.evaluate("window.__geminiFail = 'Gemini\\'s free limit is used up for now.'")
@@ -1061,6 +1063,7 @@ class Scenario:
             ("compact totals are plain, Nutrients table has the legend", self.compact_totals_are_plain),
             ("total and added sugars: entered, not listed, noted, limit colors", lambda: added_sugars(self)),
             ("saved products and recipes gain added sugars without a rescan", lambda: saved_foods_refresh(self)),
+            ("quick add from a Claude chat: prompt, paste, check, add, Undo", lambda: chat_paste(self)),
             ("online search + barcode entry (mocked)", self.online_search_and_barcode), ("Progress charts with data", lambda: (self.seed_history(), self.progress())),
             ("foods, more, account, diary screens", self.other_screens), ("units and calorie override", self.settings_flow),
             ("reload persists", self.reload_persists), ("export JSON, restore in a fresh browser", self.export_then_import),

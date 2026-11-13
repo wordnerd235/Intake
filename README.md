@@ -168,6 +168,16 @@ Each food lists the portions USDA publishes (for example "1 medium", "1 cup", "1
 
 Numbers you type accept `1.5`, `1,5` (decimal comma), `1/2`, `1 1/2` and thousands separators: `1,200` is 1200 and `1,234,567` is 1234567. A comma that could mean either (`1,2345`) is refused with a message instead of guessed. In search, baby foods are listed only when you search for one ("baby", "babyfood", "infant"), and a short finished word such as "oat" does not match "oatmeal" when it is followed by another word. `tests/unit/default-serving.test.js` checks about forty everyday foods against the real data.
 
+## Quick add from a Claude chat
+
+If you ask Claude (or another chat assistant) to estimate a meal, Intake can read its answer. In Add food, tap Quick add, then Paste from a Claude chat. The first time, open "The prompt to give Claude" and tap Copy prompt. Paste that at the start of your chat, or into a Claude project's instructions, and every answer ends with an "Intake" block: one food per block, with calories, macros, total and added sugars and the rest. Copy the answer (or just the block), tap Paste, check the foods, remove any you didn't eat, pick the meal, and add them all at once. Each food becomes a Quick add entry, and Undo takes them all back off.
+
+Intake only reads lines like `Calories: 680` or `Protein: 42 g`, so pasting the whole answer is fine. It won't guess:
+- A range ("600-700") or a % Daily Value is left out and named on the screen.
+- "unknown" stays unknown, never 0.
+- Added sugars above total sugars are left as not listed.
+- A food without calories is skipped.
+
 ## Total sugars and added sugars
 
 Foods carry two sugar numbers, as on a US label ("Total Sugars 12g / Includes 8g Added Sugars"). Added sugars have a daily limit of 50 g (the FDA Daily Value; change it under More, then Nutrient targets) and turn green or red in the Nutrients table. Total sugars get a plain bar with no limit. Many foods don't list added sugars: the built-in USDA list has none, and neither did any food logged before this change, since the old "Sugars" number was always the total. Those foods show "not listed", are left out of the day's added-sugar total, and the table says how many foods were missing, so the limit doesn't turn green on an incomplete total. If you had set a Sugars target before, it now applies to added sugars.

@@ -112,3 +112,12 @@ test('the deployable app never references test-only files', () => {
     assert.ok(!/from '\.\.?\/\.\.\/(tests|tools|scripts)\//.test(read(f)) && !/import\(['"][^'"]*\/(tests|tools|scripts)\//.test(read(f)), `${f} must not import from test-only folders`);
   }
 });
+
+test('iOS cannot zoom the app out, and pinch-zoom in stays allowed', () => {
+  const vp = (read('index.html').match(/<meta name="viewport" content="([^"]+)"/) || [])[1] || '';
+  assert.match(vp, /width=device-width/);
+  assert.match(vp, /minimum-scale=1\b/, 'a page wider than the screen must not shrink the whole app (iPhone, Nov 2026)');
+  assert.doesNotMatch(vp, /user-scalable\s*=\s*(no|0)|maximum-scale/, 'zooming in is an accessibility need: never block it');
+  assert.match(read('css/tokens.css'), /html, body \{ overflow-x: clip; \}/, 'clip, not hidden: hidden would make body a scroll container');
+});
+

@@ -42,6 +42,10 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; background: var(--bg); font-variant-numeric: tabular-nums; }
+/* Anything too wide is cut off at the screen edge instead of widening the page: iOS zooms the whole app out to fit a
+   wider page and stays zoomed out (seen on an iPhone, Nov 2026). With minimum-scale=1 in the viewport, pinch-zoom in
+   still works. `clip` (not `hidden`) makes no scroll container, so position: sticky keeps working. */
+html, body { overflow-x: clip; }
 html.has-overlay { overflow: hidden; }
 body {
   margin: 0; background: var(--bg); color: var(--ink); font: 400 16px/1.5 var(--font);
